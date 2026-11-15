@@ -185,6 +185,52 @@ async function askApi(hit, criteria) {
 }
 
 // ---- Settings page helpers ----
+// ---- "Ask Claude" chat: short shopping conversations, can search the web, can propose lookouts / wishlist items ----
+const CHAT_RULES = `You are the shopping helper inside the Okazje app for a student in Gdynia, Poland (prices in zl, Polish/EU shops and rules).
+Keep replies short (max ~120 words), friendly, plain text, no markdown headings. Ask at most 1-2 quick questions if something important is missing (size, budget, colour, new or used).
+You may search the web to find real current offers in legit Polish shops; give 1-3 concrete picks with price and link when useful.
+Rules: Vinted only for clothes, never shoes. Used items: OLX with OLX Przesylka. Never invent prices or links.
+When the buyer wants an ongoing lookout for something general (e.g. "a black heavyweight hoodie under 150"), end your reply with ONE line exactly like:
+<lookout>{"name":"short name","query":"OLX search words in Polish","min":20,"max":150,"mustMatch":["regex that the listing title must match, lowercase"],"exclude":["lowercase words to skip"],"criteria":"what a good hit looks like incl. size, condition, colours"}</lookout>
+When you found one specific product worth tracking in a shop, end with ONE line like:
+<item>{"name":"product name","url":"https://...","target":120,"category":"clothes|electronics|other","size":"M","used":"no","notes":"why / what to watch"}</item>
+Only add these lines when the buyer agreed or clearly asked for it.`;
+ipcMain.handle("chat", async (_e, messages, ctx) => {
+  const mode = prefs().claudeMode;
+  if (mode === "off") return { error: "Claude is turned off in Settings > App." };
+  const convo = (messages || []).slice(-16).map((m) => (m.role === "user" ? "Buyer: " : "You: ") + m.text).join("\n\n");
+  const intro = CHAT_RULES + "\n\nBuyer's sizes: " + ((ctx && ctx.sizes) || "unknown") + "\nAlready on the wishlist: " + ((ctx && ctx.wishlist) || "nothing") +
+    "\nCurrent OLX lookouts: " + ((ctx && ctx.searches) || "none") + "\nToday: " + new Date().toISOString().slice(0, 10);
+  if (mode === "api") {
+    const key = apiKey(); if (!key) return { error: "No API key saved in Settings > App." };
+    try {
+      const r = await net.fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 1200, system: intro,
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }],
+          messages: (messages || []).slice(-16).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text })) })
+      });
+      const j = await r.json();
+      if (!r.ok) return { error: "API error: " + ((j.error && j.error.message) || r.status) };
+      return { text: (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim() };
+    } catch (e) { return { error: e.message }; }
+  }
+  const exe = findClaude(); if (!exe) return { error: "Claude isn't installed. Settings > App > Install Claude." };
+  const prompt = intro + "\n\nConversation so far:\n" + convo + "\n\nWrite your next reply to the buyer.";
+  const out = await new Promise((resolve) => {
+    let txt = "";
+    const p = spawn(exe, ["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "12"], { shell: exe.endsWith(".cmd"), windowsHide: true });
+    const t = setTimeout(() => { p.kill(); resolve(""); }, 300000);
+    p.stdout.on("data", (d) => (txt += d));
+    p.on("error", () => { clearTimeout(t); resolve(""); });
+    p.on("close", () => { clearTimeout(t); resolve(txt.trim()); });
+    p.stdin.end(prompt);
+  });
+  if (!out) return { error: "No answer from Claude (timed out?)." };
+  if (/please run \/login|not logged in|invalid api key/i.test(out)) return { error: "Claude isn't logged in. Settings > App > Log in to Claude." };
+  return { text: out };
+});
+
 const TEST_HIT = { name: "Test: Sony DualSense controller, white", price: 199, url: "https://example.com", desc: "New, sealed, from a Polish shop." };
 ipcMain.handle("appInfo", () => {
   const p = prefs();
