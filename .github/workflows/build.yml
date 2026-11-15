@@ -23,7 +23,9 @@ jobs:
           node-version: 22
       - name: Copy the web page into the app
         shell: bash
-        run: rm -rf web && cp -r ../web web
+        run: |
+          rm -rf web && cp -r ../web web
+          echo '{"build": ${{ github.run_number }}}' > build-info.json
       - run: npm install
       - name: Build
         shell: bash

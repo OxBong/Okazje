@@ -21,6 +21,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "build-info.json",
       "web/**/*",
       "assets/**/*",
       "build/icon.png"

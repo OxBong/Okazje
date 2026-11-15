@@ -26,10 +26,16 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
-  win.loadFile(path.join(__dirname, "web", "index.html"));
+  // The page comes from the website, so page fixes arrive without reinstalling.
+  // Offline or website down: fall back to the copy built into the app.
+  const local = () => win.loadFile(path.join(__dirname, "web", "index.html"));
+  win.webContents.on("did-fail-load", (_e, code, _d, url, isMain) => {
+    if (isMain && code !== -3 && url.startsWith("https:")) { log("website failed (" + code + "), using built-in page"); local(); }
+  });
+  win.loadURL(WEB_URL).catch(() => {});
   // Links open in the normal browser
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
-  win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith("file:")) { e.preventDefault(); shell.openExternal(url); } });
+  win.webContents.on("will-navigate", (e, url) => { if (!url.startsWith("file:") && !url.startsWith(WEB_URL)) { e.preventDefault(); shell.openExternal(url); } });
   // Closing the window keeps the checker running in the tray
   win.on("close", (e) => { if (!quitting) { e.preventDefault(); win.hide(); if (process.platform === "darwin") app.dock.hide(); } });
   win.once("ready-to-show", () => { if (!app.getLoginItemSettings().wasOpenedAsHidden && !process.argv.includes("--hidden")) show(); });
@@ -54,6 +60,7 @@ function createTray() {
     { type: "separator" },
     { label: "Start at login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin,
       click: (m) => setLogin(m.checked) },
+    { label: `Version: build ${BUILD || "dev"}`, enabled: false },
     { label: "Show log", click: () => shell.openPath(path.join(dataDir(), "log.txt")) },
     { type: "separator" },
     { label: "Quit Okazje (stops checking)", click: () => { quitting = true; app.quit(); } }
@@ -133,6 +140,38 @@ Link: ${hit.url}
   return out.length > 300 ? out.slice(0, 300) + "..." : out;
 }
 
+// ---- Auto-update: checks GitHub releases on start and every 6 hours, installs a newer build by itself ----
+const BUILD = (() => { try { return require("./build-info.json").build; } catch { return 0; } })();
+let updating = false;
+async function checkUpdate() {
+  if (!BUILD || updating) return;
+  try {
+    const r = await net.fetch("https://api.github.com/repos/OxBong/okazje/releases/latest", { headers: { "User-Agent": "Okazje" } });
+    if (!r.ok) return;
+    const rel = await r.json(), n = parseInt(String(rel.tag_name).replace("build-", ""), 10);
+    if (!(n > BUILD)) return;
+    const ext = process.platform === "darwin" ? ".dmg" : ".exe";
+    const asset = (rel.assets || []).find((a) => a.name.endsWith(ext));
+    if (!asset) return;
+    updating = true; log(`update: build ${BUILD} -> ${n}`);
+    const f = path.join(os.tmpdir(), "okazje-update" + ext);
+    const d = await net.fetch(asset.browser_download_url);
+    if (!d.ok) throw new Error("download HTTP " + d.status);
+    fs.writeFileSync(f, Buffer.from(await d.arrayBuffer()));
+    if (process.platform === "darwin") {
+      const bundle = path.resolve(process.execPath, "../../..");
+      const mnt = path.join(os.tmpdir(), "okazje-mnt");
+      const sh = `sleep 2; hdiutil attach -nobrowse -quiet -mountpoint "${mnt}" "${f}" && ` +
+        `rm -rf "${bundle}.old" && mv "${bundle}" "${bundle}.old" && ditto "${mnt}/Okazje.app" "${bundle}" && rm -rf "${bundle}.old"; ` +
+        `[ -d "${bundle}" ] || mv "${bundle}.old" "${bundle}"; hdiutil detach -quiet "${mnt}"; xattr -cr "${bundle}"; open "${bundle}" --args --hidden`;
+      spawn("/bin/bash", ["-c", sh], { detached: true, stdio: "ignore" }).unref();
+    } else {
+      spawn(f, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
+    }
+    quitting = true; app.quit();
+  } catch (e) { updating = false; log("update failed: " + e); }
+}
+
 app.whenReady().then(() => {
   if (process.platform === "darwin" && app.dock) app.dock.setIcon(path.join(__dirname, "build", "icon.png"));
   // First launch: start at login (can be turned off in the tray menu)
@@ -141,6 +180,7 @@ app.whenReady().then(() => {
   createWindow(); createTray();
   const wake = () => win && win.webContents.send("wake");
   powerMonitor.on("resume", wake); powerMonitor.on("unlock-screen", wake);
+  setTimeout(checkUpdate, 60e3); setInterval(checkUpdate, 6 * 3600e3);
 });
 app.on("activate", show);
 app.on("before-quit", () => { quitting = true; });
