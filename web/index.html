@@ -155,6 +155,8 @@ a.btn { text-decoration: none; display: inline-block; }
 .lb { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92); display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
 .lb img { flex: 0 0 100%; width: 100%; height: 100%; object-fit: contain; scroll-snap-align: center; }
 .lb button { position: fixed; top: 14px; right: 14px; z-index: 61; }
+.hit .an summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+.hit .an-t { white-space: pre-wrap; font-size: 13px; line-height: 1.5; margin-top: 6px; color: var(--ink); }
 .hit .b { padding: 12px 14px; display: grid; gap: 6px; }
 .hit a { font-weight: 600; font-size: 14px; text-decoration: none; line-height: 1.3; }
 .hit .pr { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
@@ -504,6 +506,10 @@ a.btn { text-decoration: none; display: inline-block; }
       var a = el("a", null, h.name); if (/^https:\/\//.test(h.url || "")) { a.href = h.url; a.target = "_blank"; a.rel = "noopener"; }
       b.append(a, el("div", "pr", zl(h.price)), el("div", "m", [h.city, ago(h.time), h.storedUntil ? "photos kept until " + new Date(h.storedUntil).toLocaleDateString("pl-PL") : ""].filter(Boolean).join(" · ")));
       if (h.verdict) b.append(el("div", "v", h.verdict));
+      if (h.analysis) {
+        var det = el("details", "an"), sm = el("summary", null, "Claude's full analysis");
+        det.append(sm, el("div", "an-t", h.analysis)); b.append(det);
+      }
       c.append(b); box.append(c);
     });
   }

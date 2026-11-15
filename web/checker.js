@@ -72,6 +72,12 @@
     var crit = h.criteria || (h.name + ", target price " + h.target + " zł, new from a legit Polish shop");
     if (sizesText && (h.clothes || CLOTHES.test(h.name))) crit += ". Buyer's sizes: " + sizesText + ". Say if the listed size likely fits.";
     try { h.verdict = await B.verdict(h, crit); } catch (e) { h.verdict = null; }
+    if (h.verdict) {                              // line 1 = short opinion (push), the rest = full analysis (app)
+      var parts = String(h.verdict).split(/\n\s*\n/);
+      h.verdict = parts[0].trim().slice(0, 300);
+      var rest = parts.slice(1).join("\n\n").trim();
+      if (rest) h.analysis = rest;
+    }
     if (h.verdict && /^SKIP/.test(h.verdict) && /Apple Watch/.test(h.name)) {   // junk watch listings: drop silently
       await sb.from("hits").delete().eq("id", id); return false;
     }

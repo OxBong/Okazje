@@ -126,10 +126,14 @@ async function verdict(hit, criteria) {
 
   const out = mode === "api" ? await askApi(hit, criteria) : await askCli(hit, criteria);
   if (!/^(BUY|MAYBE|SKIP)/.test(out)) { if (out) log("claude error: " + out.slice(0, 300)); return null; }
-  return out.length > 300 ? out.slice(0, 300) + "..." : out;
+  return out.length > 2500 ? out.slice(0, 2500) + "..." : out;
 }
 function basePrompt(hit, criteria) {
-  return `You judge a deal for a student in Poland. Reply in max 3 short sentences, English, no markdown. Start with BUY, MAYBE or SKIP, then why, and a fair offer price in zl if it's a used listing. Flag scam signs. Don't claim a defect you can't clearly see; say "looks like" when unsure.
+  return `You judge a deal for a student in Poland. Plain text, English, no markdown except "- " bullets. Flag scam signs. Don't claim a defect you can't clearly see; say "looks like" when unsure.
+Answer in exactly this shape:
+Line 1: BUY, MAYBE or SKIP, then one short sentence why (max 200 characters).
+Blank line, then "Details:" and 3-6 short lines starting with "- ": what each photo shows (say photo numbers; does it match the title: model, size, colour; stock photos; damage, scratches, missing parts, iCloud lock, battery or spec screens), the key facts from the description, and a fair offer price in zl for used listings.
+For used listings only: blank line, then "Ask the seller:" and one short message in Polish starting "Dzień dobry," with only the most important question(s) the photos and description don't already answer. No price offer in it.
 Buyer wants: ${criteria}
 Listing: ${hit.name}
 Price: ${hit.price} zl${hit.city ? " in " + hit.city : ""}
@@ -172,7 +176,7 @@ async function askApi(hit, criteria) {
     const r = await net.fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 300, messages: [{ role: "user", content }] })
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 900, messages: [{ role: "user", content }] })
     });
     const j = await r.json();
     if (!r.ok) return "API error: " + ((j.error && j.error.message) || r.status);
