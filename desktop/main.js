@@ -185,7 +185,7 @@ const TEST_HIT = { name: "Test: Sony DualSense controller, white", price: 199, u
 ipcMain.handle("appInfo", () => {
   const p = prefs();
   return { build: BUILD, latest: latestBuild, platform: process.platform, autoUpdate: p.autoUpdate, claudeMode: p.claudeMode,
-    hasKey: !!p.apiKey, claudePath: findClaude(), canEncrypt: safeStorage.isEncryptionAvailable() };
+    hasKey: !!p.apiKey, claudePath: findClaude() };
 });
 ipcMain.handle("setPref", (_e, k, v) => { if (["autoUpdate", "claudeMode"].includes(k)) setPref(k, v); });
 ipcMain.handle("setApiKey", (_e, key) => {
