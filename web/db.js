@@ -14,7 +14,7 @@
       return Promise.all([
         sb.from("items").select("id,data"),
         sb.from("status").select("id,data"),
-        sb.from("hits").select("data,created_at").order("created_at", { ascending: false }).limit(60),
+        sb.from("hits").select("id,data,created_at").order("created_at", { ascending: false }).limit(60),
         sb.from("searches").select("id,data"),
         sb.from("runner").select("device,beat").maybeSingle()
       ]).then(function (r) {
@@ -23,7 +23,7 @@
         return {
           wishlist: r[0].data.map(function (x) { return Object.assign({}, x.data, { id: x.id }); }),
           status: status,
-          hits: r[2].data.map(function (x) { return Object.assign({ time: x.created_at }, x.data); }),
+          hits: r[2].data.map(function (x) { return Object.assign({ time: x.created_at, hitId: x.id }, x.data); }),
           searches: r[3].data.map(function (x) { return Object.assign({}, x.data, { id: x.id }); }),
           lastRun: r[4].data ? r[4].data.beat : null,
           runner: r[4].data ? r[4].data.device : null
@@ -37,6 +37,13 @@
     deleteItem: function (id) { return sb.from("items").delete().eq("id", id).then(must); },
     saveSearch: function (s) { var d = Object.assign({}, s); delete d.id; return sb.from("searches").upsert({ user_id: DB.uid, id: s.id, data: d }).then(must); },
     deleteSearch: function (id) { return sb.from("searches").delete().eq("id", id).then(must); },
+    // Short-lived links to the photos saved in the cloud (the bucket is private)
+    photoUrls: function (paths) {
+      if (!paths.length) return Promise.resolve({});
+      return sb.storage.from("photos").createSignedUrls(paths, 6 * 3600).then(function (r) {
+        var m = {}; (r.data || []).forEach(function (x) { if (x.signedUrl) m[x.path] = x.signedUrl; }); return m;
+      }).catch(function () { return {}; });
+    },
     getSetting: function (k) { return sb.from("settings").select("value").eq("key", k).maybeSingle().then(function (r) { must(r); return r.data ? r.data.value : null; }); },
     setSetting: function (k, v) { return sb.from("settings").upsert({ user_id: DB.uid, key: k, value: v }).then(must); },
     // Live updates: any change from another device refreshes the page

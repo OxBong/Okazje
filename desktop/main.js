@@ -90,6 +90,11 @@ ipcMain.handle("fetchText", async (_e, url, opts = {}) => {
     return { status: r.status, text: await r.text() };
   } finally { clearTimeout(t); }
 });
+ipcMain.handle("fetchBytes", async (_e, url) => {
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 30000);
+  try { const r = await net.fetch(url, { headers: { "User-Agent": UA }, signal: ctrl.signal }); if (!r.ok) return null; return new Uint8Array(await r.arrayBuffer()); }
+  finally { clearTimeout(t); }
+});
 ipcMain.handle("device", () => {
   const kind = process.platform === "darwin" ? "Mac" : process.platform === "win32" ? "PC" : "Linux";
   return `${kind} (${os.hostname().replace(/\.local$/, "")})`;
@@ -144,7 +149,7 @@ async function askCli(hit, criteria) {
   }
   const args = ["-p", "--model", "haiku"];
   if (files.length) {
-    prompt += `Photos of the listing (read every one with the Read tool before answering; look for battery health, specs screens, damage, charger, serial/iCloud hints): ${files.join(", ")}`;
+    prompt += `Photos of the listing (read every one with the Read tool before answering; check they show the same item as the title and description (model, size, colour; not stock photos) and point out anything that shouldn't be there: damage, scratches, missing parts or charger, wrong item, iCloud/activation lock, battery health or spec screens that don't match): ${files.join(", ")}`;
     args.push("--allowedTools", "Read", "--add-dir", pdir, "--max-turns", "10");
   }
   const out = await new Promise((resolve) => {
@@ -162,7 +167,7 @@ async function askCli(hit, criteria) {
 async function askApi(hit, criteria) {
   const key = apiKey(); if (!key) return "";
   const content = (hit.photos || []).slice(0, 6).map((u) => ({ type: "image", source: { type: "url", url: u } }));
-  content.push({ type: "text", text: basePrompt(hit, criteria) + (content.length ? "Photos of the listing are attached; look for battery health, specs screens, damage, charger, serial/iCloud hints." : "") });
+  content.push({ type: "text", text: basePrompt(hit, criteria) + (content.length ? "Photos of the listing are attached; check they show the same item as the title and description (model, size, colour; not stock photos) and point out anything that shouldn't be there: damage, scratches, missing parts or charger, wrong item, iCloud/activation lock, battery health or spec screens that don't match." : "") });
   try {
     const r = await net.fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

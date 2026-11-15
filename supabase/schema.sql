@@ -97,3 +97,13 @@ end $$;
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on items, searches, status, hits, seen, settings, runner to authenticated;
 grant execute on function claim_runner(text), mark_seen(text, text[]), cleanup() to authenticated;
+
+-- Photos of used listings (also in photos.sql)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('photos', 'photos', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do nothing;
+
+drop policy if exists "okazje own photos" on storage.objects;
+create policy "okazje own photos" on storage.objects for all to authenticated
+  using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);

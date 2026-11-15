@@ -36,16 +36,46 @@
     return B.fetchText("https://ntfy.sh/", { method: "POST", body: JSON.stringify(p), headers: { "Content-Type": "application/json; charset=utf-8" } });
   }
 
+  // Used listings: keep copies of the photos in the cloud for PHOTO_DAYS (OLX deletes them when the listing ends)
+  var PHOTO_DAYS = 14;
+  async function savePhotos(id, h) {
+    if (!B.fetchBytes || !(h.photos || []).length) return;
+    var paths = [];
+    for (var i = 0; i < h.photos.length && i < 8; i++) {
+      try {
+        var bytes = await B.fetchBytes(h.photos[i]); if (!bytes) continue;
+        var p = window.DB.uid + "/" + id + "/" + (i + 1) + ".jpg";
+        var r = await sb.storage.from("photos").upload(p, new Blob([bytes], { type: "image/jpeg" }), { contentType: "image/jpeg", upsert: true });
+        if (r.error) { B.log("photo upload failed: " + r.error.message); break; }
+        paths.push(p);
+      } catch (e) { B.log("photo failed: " + e); }
+    }
+    if (paths.length) { h.stored = paths; h.storedUntil = new Date(Date.now() + PHOTO_DAYS * 864e5).toISOString(); }
+  }
+  async function cleanPhotos() {
+    var cutoff = new Date(Date.now() - PHOTO_DAYS * 864e5).toISOString();
+    var r = await sb.from("hits").select("id,data").lt("created_at", cutoff).not("data->stored", "is", null).limit(30);
+    if (r.error || !r.data) return;
+    for (var i = 0; i < r.data.length; i++) {
+      var row = r.data[i], d = row.data;
+      var rm = await sb.storage.from("photos").remove(d.stored || []);
+      if (rm.error) { B.log("photo cleanup failed: " + rm.error.message); return; }
+      delete d.stored; delete d.storedUntil;
+      await sb.from("hits").update({ data: d }).eq("id", row.id);
+    }
+  }
+
   async function newHit(topic, key, h) {
     var id = await storeHit(key, h);
     if (!id) return false;                       // another computer already reported it
+    await savePhotos(id, h);
     var crit = h.criteria || (h.name + ", target price " + h.target + " zł, new from a legit Polish shop");
     if (sizesText && (h.clothes || CLOTHES.test(h.name))) crit += ". Buyer's sizes: " + sizesText + ". Say if the listed size likely fits.";
     try { h.verdict = await B.verdict(h, crit); } catch (e) { h.verdict = null; }
     if (h.verdict && /^SKIP/.test(h.verdict) && /Apple Watch/.test(h.name)) {   // junk watch listings: drop silently
       await sb.from("hits").delete().eq("id", id); return false;
     }
-    if (h.verdict) await sb.from("hits").update({ data: h }).eq("id", id);
+    if (h.verdict || h.stored) await sb.from("hits").update({ data: h }).eq("id", id);
     if (topic) { try { await push(topic, h); } catch (e) { B.log("push failed: " + e); } }
     B.notify("Okazje: " + h.name, h.price + " zł" + (h.verdict ? " · " + h.verdict.split(".")[0] : ""));
     return true;
@@ -133,6 +163,7 @@
       await sb.from("runner").update({ beat: nowIso() }).eq("user_id", window.DB.uid);
       if (topic) B.fetchText("https://ntfy.sh/" + topic + "-hb", { method: "POST", body: "up" }).catch(function () {});
       if (Math.random() < 0.05) sb.rpc("cleanup");
+      await cleanPhotos().catch(function (e) { B.log("photo cleanup: " + e); });
       B.log("check done, " + n + " new hit(s)");
       return n + " new hit(s)";
     } catch (ex) { B.log("check error: " + (ex.message || ex)); return "error: " + (ex.message || ex); }

@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("okazje", {
   platform: process.platform,
   fetchText: (url, opts) => ipcRenderer.invoke("fetchText", url, opts),
+  fetchBytes: (url) => ipcRenderer.invoke("fetchBytes", url),
   verdict: (hit, criteria) => ipcRenderer.invoke("verdict", hit, criteria),
   notify: (title, body) => ipcRenderer.invoke("notify", title, body),
   device: () => ipcRenderer.invoke("device"),
