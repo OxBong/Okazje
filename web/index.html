@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Okazje</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Okazje"><meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #000; --surface: #121212; --ink: #f2f2f2; --muted: #8f8f8f; --line: #262626; --soft: #1d1d1d;
+  --accent: #ff5b35; --accent-soft: #2a140e; --good: #14a86d; --warn: #f0a020; --warn-soft: #2a1f0b; --bad: #ff5a4f;
+  --f: "Onest", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --r: 18px; --shadow: 0 0 0 1px #1f1f1f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); overflow-x: clip; max-width: 100%; }
+body { color: var(--ink); font-family: var(--f); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
+[hidden] { display: none !important; }
+.login { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; padding: 16px; }
+.login form { width: 100%; max-width: 360px; display: grid; gap: 12px; }
+.login h1 { font-size: 28px; font-weight: 800; }
+.login p { color: var(--muted); margin: 0; }
+.login input, .set input { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.login .err { color: var(--bad); font-size: 13px; min-height: 18px; }
+.login .row { display: flex; gap: 8px; }
+.login .row button { flex: 1; justify-content: center; }
+.set { display: grid; gap: 10px; }
+.set label { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+.set .row { display: flex; gap: 8px; flex-wrap: wrap; }
+body.mac-app .top { padding-top: 34px; -webkit-app-region: drag; }
+body.mac-app .top button, body.mac-app .top a { -webkit-app-region: no-drag; }
+
+.top { position: sticky; top: 0; z-index: 5; background: rgba(0,0,0,.88); backdrop-filter: saturate(1.6) blur(14px); padding: 12px 16px; }
+.top-in { max-width: 1120px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.logo svg { width: 18px; height: 18px; }
+.brand h1 { font-size: 20px; font-weight: 800; }
+.sync { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; min-width: 0; max-width: 100%; }
+.sync span { overflow: hidden; text-overflow: ellipsis; }
+.brand > div { overflow: hidden; }
+.sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.sync.ok i { background: var(--good); }
+.topbtns { display: flex; gap: 8px; }
+.add-btn { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 9px 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: transform .15s; }
+.add-btn.ghost { background: var(--soft); color: var(--ink); }
+.add-btn:active { transform: scale(.97); }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 8px 16px 56px; display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 24px; align-items: start; }
+.col, .side-col { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; min-width: 0; }
+
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+.stat { background: var(--surface); border-radius: var(--r); padding: 14px 16px; display: grid; gap: 2px; min-width: 0; box-shadow: var(--shadow); }
+.stat .k { font-size: 12px; color: var(--muted); font-weight: 500; }
+.stat .v { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat .s { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat.hot { background: var(--good); color: #fff; }
+.stat.hot .k, .stat.hot .s { color: rgba(255,255,255,.85); }
+
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.chips { display: flex; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { border: 0; background: var(--surface); border-radius: 999px; padding: 7px 14px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; box-shadow: inset 0 0 0 1px var(--line); }
+.chips button[aria-pressed="true"] { background: var(--ink); color: #000; box-shadow: none; }
+.checked { font-size: 12px; color: var(--muted); }
+
+.sheet { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 18px; display: grid; gap: 14px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet-head h2 { font-size: 18px; font-weight: 700; }
+form { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; }
+.f { display: grid; gap: 5px; min-width: 0; }
+.s6 { grid-column: span 6; } .s3 { grid-column: span 3; } .s2 { grid-column: span 2; }
+.lab { font-size: 12px; font-weight: 600; color: var(--muted); }
+input, select, textarea { font-size: 16px; background: var(--soft); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; width: 100%; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); background: var(--surface); }
+textarea { resize: vertical; min-height: 44px; }
+.seg { display: flex; background: var(--soft); border-radius: 12px; padding: 3px; }
+.seg label { flex: 1; text-align: center; padding: 7px 6px; border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 500; position: relative; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg label:has(input:checked) { background: var(--surface); box-shadow: 0 0 0 1px #333; }
+.actions { grid-column: span 6; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.btn { border: 0; background: var(--soft); padding: 10px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; }
+.btn:hover { background: var(--line); }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.small { padding: 7px 12px; font-size: 13px; border-radius: 10px; }
+.btn.danger { color: var(--bad); }
+.x { border: 0; background: var(--soft); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1; }
+
+.list { display: grid; gap: 12px; }
+.item { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 18px; display: grid; gap: 14px; min-width: 0; overflow-wrap: anywhere; transition: transform .2s, box-shadow .2s; }
+.item.bought { opacity: .55; }
+.head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.head > div { min-width: 0; }
+.item h3 { font-size: 17px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { background: var(--soft); border-radius: 8px; padding: 2px 8px; font-size: 12px; color: var(--muted); font-weight: 500; }
+.tag.hi { background: var(--accent-soft); color: var(--accent); }
+.pill { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; white-space: nowrap; flex: none; }
+.pill.buy { background: var(--good); color: #fff; }
+.pill.close { background: var(--warn-soft); color: var(--warn); }
+.pill.wait, .pill.done { background: var(--soft); color: var(--muted); }
+.pill.unchecked { color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+
+.price { display: flex; align-items: end; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.price .big { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.price .big.sm { font-size: 20px; }
+.price .was { font-size: 14px; color: var(--muted); text-decoration: line-through; margin-left: 8px; font-weight: 500; }
+.price .shop { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.price .shop a { color: var(--ink); font-weight: 600; text-decoration: none; border-bottom: 1.5px solid var(--accent); }
+.price .side { text-align: right; font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.price .side b { color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+.gauge { display: grid; gap: 6px; }
+.track { height: 6px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+.fill { height: 100%; border-radius: 99px; background: #555; width: 0; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.fill.buy { background: var(--good); } .fill.close { background: var(--warn); }
+.gauge .g { font-size: 12px; color: var(--muted); font-weight: 500; }
+.gauge .g.buy { color: var(--good); } .gauge .g.close { color: var(--warn); }
+
+.verdict { font-size: 14px; line-height: 1.5; background: var(--soft); border-radius: 12px; padding: 10px 12px; }
+.notes { font-size: 13px; color: var(--muted); }
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+.shops { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+.shops a { font-size: 12px; font-weight: 600; text-decoration: none; background: var(--soft); padding: 4px 9px; border-radius: 8px; }
+.shops a:hover { background: var(--line); }
+.when { font-size: 12px; color: var(--muted); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.empty { background: var(--surface); border-radius: var(--r); padding: 20px; box-shadow: var(--shadow); color: var(--muted); }
+
+.sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 8px; }
+.sec-h h2 { font-size: 18px; font-weight: 700; }
+.hits { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.hit { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; display: grid; align-content: start; overflow-wrap: anywhere; }
+.hit img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: var(--soft); }
+.hit .b { padding: 12px 14px; display: grid; gap: 6px; }
+.hit a { font-weight: 600; font-size: 14px; text-decoration: none; line-height: 1.3; }
+.hit .pr { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.hit .m { font-size: 12px; color: var(--muted); }
+.hit .v { font-size: 13px; background: var(--soft); border-radius: 10px; padding: 8px 10px; }
+
+.card { background: var(--surface); min-width: 0; border-radius: var(--r); box-shadow: var(--shadow); padding: 18px; display: grid; gap: 12px; }
+.card h2 { font-size: 16px; font-weight: 700; }
+.srch { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.srch:last-child { border-bottom: 0; padding-bottom: 0; }
+.srch b { font-size: 14px; font-weight: 600; }
+.srch span { font-size: 12px; color: var(--muted); }
+.srch a { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.cal { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.cal li { display: grid; grid-template-columns: 46px minmax(0,1fr); gap: 12px; align-items: start; }
+.cal .d { text-align: center; background: var(--soft); border-radius: 12px; padding: 6px 0; font-weight: 700; font-size: 17px; line-height: 1.05; }
+.cal .d small { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.cal li.next .d { background: var(--accent); color: #fff; }
+.cal li.next .d small { color: rgba(255,255,255,.85); }
+.cal li.past { opacity: .4; }
+.cal b { font-weight: 600; font-size: 14px; }
+.cal .in { font-size: 12px; color: var(--accent); font-weight: 600; margin-left: 6px; }
+.cal p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.tips { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; color: var(--muted); }
+.tips b { color: var(--ink); font-weight: 600; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #000; padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 9; }
+
+@media (hover: hover) { .item:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px #333; } }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0,1fr); } .summary { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 520px) {
+  .stat .v { font-size: 22px; } .item, .card, .sheet { padding: 15px; } .price .side { text-align: left; }
+  .s3, .s2 { grid-column: span 6; } .brand h1 { font-size: 18px; } .add-btn { padding: 8px 12px; } .price .big { font-size: 27px; }
+}
+</style></head>
+<body>
+<div class="login" id="login" hidden>
+  <form id="loginForm">
+    <h1>Okazje</h1>
+    <p>Log in to see your wishlist on any device.</p>
+    <input id="lEmail" type="email" autocomplete="email" placeholder="Email" required>
+    <input id="lPw" type="password" autocomplete="current-password" placeholder="Password (6+ characters)" minlength="6" required>
+    <div class="err" id="lErr"></div>
+    <div class="row"><button class="add-btn" type="submit">Log in</button><button class="add-btn ghost" type="button" id="lSignup">Create account</button></div>
+  </form>
+</div>
+<div class="top"><div class="top-in">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="8" cy="8" r="1.4" fill="#fff"/></svg></div>
+    <div style="min-width:0"><h1>Okazje</h1><span class="sync" id="sync"><i></i><span id="syncT">Connecting…</span></span></div>
+  </div>
+  <div class="topbtns">
+    <button class="add-btn ghost" id="checkBtn" type="button">Check now</button>
+    <button class="add-btn" id="openAdd" type="button"><span aria-hidden="true">+</span> Add</button>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <div class="col">
+    <section class="summary">
+      <div class="stat"><span class="k">Watching</span><span class="v" id="sCount">0</span><span class="s" id="sCountSub">items</span></div>
+      <div class="stat hot"><span class="k">Buy now</span><span class="v" id="sBuy">0</span><span class="s">at or under target</span></div>
+      <div class="stat"><span class="k">New hits</span><span class="v" id="sHits">0</span><span class="s">last 24 hours</span></div>
+      <div class="stat"><span class="k" id="sNextLabel">Black Friday in</span><span class="v" id="sNextDays">–</span><span class="s" id="sNextName">–</span></div>
+    </section>
+
+    <section class="sheet" id="addBox" hidden>
+      <div class="sheet-head"><h2 id="addTitle">Add something</h2><button class="x" type="button" id="closeAdd" aria-label="Close">×</button></div>
+      <form id="form" autocomplete="off">
+        <input type="hidden" id="fId">
+        <div class="f s6"><label class="lab" for="fName">What is it</label><input id="fName" required placeholder="e.g. Nike Air Force 1 white, or 27&quot; OLED monitor"></div>
+        <div class="f s6"><label class="lab" for="fUrl">Shop link to watch (optional)</label><input id="fUrl" type="url" placeholder="https://www.x-kom.pl/p/…"></div>
+        <div class="f s3"><span class="lab">Need or want</span>
+          <div class="seg"><label><input type="radio" name="kind" id="fKindNeed" value="need" checked><span>Need</span></label><label><input type="radio" name="kind" id="fKindWant" value="want"><span>Want</span></label></div></div>
+        <div class="f s3"><label class="lab" for="fCat">Category</label><select id="fCat"><option value="electronics">Electronics</option><option value="clothes">Clothes &amp; shoes</option><option value="other">Other</option></select></div>
+        <div class="f s2"><label class="lab" for="fTarget">Target price (zł)</label><input id="fTarget" type="number" min="0" step="1" placeholder="900"></div>
+        <div class="f s2"><label class="lab" for="fMax">Absolute max (zł)</label><input id="fMax" type="number" min="0" step="1" placeholder="optional"></div>
+        <div class="f s2"><label class="lab" for="fPrio">Priority</label><select id="fPrio"><option value="1">High</option><option value="2" selected>Medium</option><option value="3">Low</option></select></div>
+        <div class="f s3"><label class="lab" for="fSize">Size / specs</label><input id="fSize" placeholder="EU 44, L, 32 GB RAM…"></div>
+        <div class="f s3"><label class="lab" for="fUsed">Used is OK?</label><select id="fUsed"><option value="yes">Yes, used is fine</option><option value="no">New only</option></select></div>
+        <div class="f s6"><label class="lab" for="fNotes">Notes</label><textarea id="fNotes" rows="2" placeholder="Colour, brands, a deadline"></textarea></div>
+        <div class="actions"><button type="button" class="btn" id="fCancel">Cancel</button><button type="submit" class="btn primary" id="fSubmit">Add to list</button></div>
+      </form>
+    </section>
+
+    <div class="bar">
+      <div class="chips" role="group" aria-label="Filter">
+        <button type="button" data-f="all" aria-pressed="true">All</button>
+        <button type="button" data-f="buy" aria-pressed="false">Buy now</button>
+        <button type="button" data-f="electronics" aria-pressed="false">Tech</button>
+        <button type="button" data-f="clothes" aria-pressed="false">Clothes</button>
+        <button type="button" data-f="other" aria-pressed="false">Other</button>
+        <button type="button" data-f="bought" aria-pressed="false">Bought</button>
+      </div>
+      <span class="checked" id="lastCheck"></span>
+    </div>
+    <div class="list" id="list"></div>
+
+    <div class="sec-h"><h2>Latest hits</h2><span class="checked">from the 15-minute checks</span></div>
+    <div class="hits" id="hits"></div>
+  </div>
+
+  <aside class="side-col">
+    <section class="card"><h2>OLX searches</h2><div id="searches"></div></section>
+    <section class="card"><h2>Settings</h2>
+      <div class="set">
+        <label>Phone alerts topic (ntfy)<input id="sNtfy" type="text" autocomplete="off" spellcheck="false" placeholder="your-ntfy-topic"></label>
+        <div class="row">
+          <button class="btn small" type="button" id="sSave">Save topic</button>
+          <button class="btn small" type="button" id="sImport">Import old wishlist</button>
+          <button class="btn small danger" type="button" id="sLogout">Log out</button>
+        </div>
+        <input type="file" id="sFile" accept=".json,application/json" hidden>
+        <span class="checked" id="sDev"></span>
+      </div>
+    </section>
+    <section class="card"><h2>Sale calendar</h2><ul class="cal" id="cal"></ul></section>
+    <section class="card"><h2>Paying less in Poland</h2>
+      <ol class="tips">
+        <li><b>Check "najniższa cena z 30 dni".</b> If it's close to the sale price, the discount is fake.</li>
+        <li><b>Pepper.pl</b> has codes and community-voted deals. Hot ones sell out in hours.</li>
+        <li><b>x-kom Gorący strzał</b> changes at 10:00 and 22:00.</li>
+        <li><b>Used:</b> only with OLX Przesyłka or Allegro buyer protection. Never a bank transfer to a stranger.</li>
+        <li><b>14 days to return</b> anything bought online. Buy at a good price, return if a better one appears.</li>
+      </ol>
+    </section>
+  </aside>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<script src="checker.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = { wishlist: [], status: {}, hits: [], searches: [] }, filter = "all", pendingDelete = null;
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function num(v) { if (v === "" || v == null) return null; var n = typeof v === "number" ? v : parseFloat(v); return isFinite(n) ? n : null; }
+  function zl(v) { var n = num(v); return n == null ? "–" : n.toLocaleString("pl-PL", { maximumFractionDigits: n % 1 ? 2 : 0 }) + " zł"; }
+  function ago(iso) {
+    if (!iso) return ""; var d = new Date(iso); if (isNaN(d)) return "";
+    var m = Math.round((Date.now() - d) / 60000);
+    if (m < 60) return m <= 1 ? "just now" : m + " min ago";
+    var h = Math.round(m / 60); if (h < 24) return h + " h ago";
+    var days = Math.round(h / 24); return days + (days === 1 ? " day ago" : " days ago");
+  }
+  function toast(t) { var x = $("toast"); x.textContent = t; x.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { x.hidden = true; }, 2600); }
+  function setSync(t, ok) { $("syncT").textContent = t; $("sync").classList.toggle("ok", !!ok); }
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+
+  var SALES = [
+    { d: "2026-11-11", name: "Singles' Day (11.11)", note: "Allegro, AliExpress and electronics shops. Good for gadgets." },
+    { d: "2026-11-27", name: "Black Friday", note: "Best day for laptops, monitors and sneakers. Black Week starts a few days before.", key: true },
+    { d: "2026-11-30", name: "Cyber Monday", note: "Online-only electronics deals at x-kom, Media Expert, Morele." },
+    { d: "2026-12-06", name: "Mikołajki", note: "Smaller promos, free delivery and bundles." },
+    { d: "2026-12-27", name: "After-Christmas sales", note: "Winter clothing sales start. Returns show up as outlet." },
+    { d: "2027-01-15", name: "Winter clearance", note: "Usually the lowest prices on winter clothes, often 50–70% off." }
+  ];
+  function dayDiff(iso) { var t = new Date(iso + "T00:00:00"), now = new Date(); now.setHours(0, 0, 0, 0); return Math.round((t - now) / 86400000); }
+  function renderCalendar() {
+    var cal = $("cal"); cal.textContent = "";
+    var nextIdx = SALES.findIndex(function (s) { return dayDiff(s.d) >= 0; });
+    SALES.forEach(function (s, i) {
+      var dd = dayDiff(s.d), dt = new Date(s.d + "T00:00:00");
+      var li = el("li", dd < 0 ? "past" : i === nextIdx ? "next" : "");
+      var day = el("div", "d"); day.append(el("small", null, dt.toLocaleDateString("en-GB", { month: "short" })), document.createTextNode(String(dt.getDate())));
+      var body = el("div"); body.append(el("b", null, s.name), el("span", "in", dd < 0 ? "done" : dd === 0 ? "today" : "in " + dd + (dd === 1 ? " day" : " days")), el("p", null, s.note));
+      li.append(day, body); cal.append(li);
+    });
+    var bf = SALES.find(function (s) { return s.key && dayDiff(s.d) >= 0; }) || SALES[nextIdx];
+    if (bf) {
+      var n = dayDiff(bf.d);
+      $("sNextLabel").textContent = bf.name + (n === 0 ? "" : " in");
+      $("sNextDays").textContent = n === 0 ? "Today" : n + (n === 1 ? " day" : " days");
+      $("sNextName").textContent = new Date(bf.d + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+    }
+  }
+
+  function shopLinks(it) {
+    var q = encodeURIComponent(it.name);
+    var dash = it.name.trim().toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]+/g, "-").replace(/^-|-$/g, "");
+    var L = [["Ceneo", "https://www.ceneo.pl/;szukaj-" + q], ["Pepper", "https://www.pepper.pl/search?q=" + q], ["Allegro", "https://allegro.pl/listing?string=" + q]];
+    if (it.category === "electronics") { L.push(["x-kom", "https://www.x-kom.pl/szukaj?q=" + q]); L.push(["Media Expert", "https://www.mediaexpert.pl/search?query%5Bquerystring%5D=" + q]); }
+    if (it.category === "clothes") {
+      L.push(["Zalando", "https://www.zalando.pl/katalog/?q=" + q]);
+      if (!/shoe|sneaker|buty|trainer|boot/i.test(it.name)) L.push(["Vinted", "https://www.vinted.pl/catalog?search_text=" + q]);
+    }
+    if (it.used !== "no") L.push(["OLX", "https://www.olx.pl/oferty/q-" + dash + "/"]);
+    return L;
+  }
+
+  function info(it) { return D.status[it.id] || {}; }
+  function status(it) {
+    if (it.bought) return { k: "done", t: "Bought", rank: 9 };
+    var s = info(it), p = num(s.price), t = num(it.target);
+    if (!/^https:\/\//.test(it.url || "")) return { k: "unchecked", t: "OLX search", rank: 3 };
+    if (p == null) return { k: "unchecked", t: s.checked ? "Price not found" : "Not checked", rank: 3 };
+    if (t == null) return { k: "wait", t: "No target", rank: 4 };
+    if (p <= t) return { k: "buy", t: "Buy now", rank: 0 };
+    if (p <= t * 1.1) return { k: "close", t: "Almost", rank: 1 };
+    return { k: "wait", t: "Wait", rank: 2 };
+  }
+
+  function renderItems() {
+    var items = D.wishlist, list = $("list"); list.textContent = "";
+    var active = items.filter(function (i) { return !i.bought; });
+    $("sCount").textContent = active.length;
+    var nb = items.length - active.length;
+    $("sCountSub").textContent = nb ? nb + " already bought" : "items on your list";
+    $("sBuy").textContent = active.filter(function (i) { return status(i).k === "buy"; }).length;
+    $("sHits").textContent = (D.hits || []).filter(function (h) { return h.time && Date.now() - new Date(h.time) < 864e5; }).length;
+    $("lastCheck").textContent = D.lastRun ? "Checked " + ago(D.lastRun) : "";
+
+    var shown = items.filter(function (i) {
+      if (filter === "bought") return i.bought;
+      if (i.bought) return false;
+      if (filter === "buy") return status(i).k === "buy";
+      if (filter === "electronics" || filter === "clothes" || filter === "other") return (i.category || "other") === filter;
+      return true;
+    }).sort(function (a, b) { return status(a).rank - status(b).rank || (a.priority || 2) - (b.priority || 2) || String(a.added || "").localeCompare(String(b.added || "")); });
+    if (!shown.length) { list.append(el("div", "empty", items.length ? "Nothing here yet." : "Your list is empty. Tap Add.")); return; }
+    shown.forEach(function (x) { list.append(card(x)); });
+  }
+
+  function card(it) {
+    var st = status(it), s = info(it);
+    var c = el("article", "item" + (it.bought ? " bought" : ""));
+    var head = el("div", "head"), left = el("div");
+    left.append(el("h3", null, it.name));
+    var tags = el("div", "tags");
+    if (it.priority === 1) tags.append(el("span", "tag hi", "Top priority"));
+    tags.append(el("span", "tag", it.kind === "need" ? "Need" : "Want"));
+    tags.append(el("span", "tag", { electronics: "Tech", clothes: "Clothes", other: "Other" }[it.category] || "Other"));
+    if (it.size) tags.append(el("span", "tag", it.size));
+    if (it.used === "yes") tags.append(el("span", "tag", "Used OK"));
+    left.append(tags);
+    head.append(left, el("span", "pill " + st.k, st.t));
+    c.append(head);
+
+    var p = num(s.price), t = num(it.target), was = num(s.lastPrice);
+    var hasUrl = /^https:\/\//.test(it.url || "");
+    var price = el("div", "price"), pl = el("div"), big = el("div");
+    big.append(el("span", "big" + (p == null ? " sm" : ""), p != null ? zl(p) : hasUrl ? (s.checked ? "No price yet" : "Checking…") : "Watching OLX"));
+    if (p != null && was != null && was > p) big.append(el("span", "was", zl(was)));
+    pl.append(big);
+    var shop = el("div", "shop");
+    if (hasUrl) { var a = el("a", null, host(it.url) || "Open offer"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; shop.append(a); }
+    else shop.textContent = "New listings show up under Latest hits";
+    pl.append(shop);
+    var side = el("div", "side");
+    var tl = el("span", null, "Target "); tl.append(el("b", null, zl(t))); side.append(tl);
+    if (it.max) side.append(el("span", null, "max " + zl(it.max)));
+    price.append(pl, side); c.append(price);
+
+    if (p != null && t != null && !it.bought) {
+      var g = el("div", "gauge"), tr = el("div", "track"), fl = el("div", "fill " + st.k);
+      tr.append(fl); g.append(tr);
+      var diff = Math.round(p - t);
+      g.append(el("span", "g " + st.k, diff <= 0 ? (diff === 0 ? "Exactly at your target" : zl(-diff) + " under your target") : zl(diff) + " above your target"));
+      c.append(g);
+      var pct = Math.max(6, Math.min(100, (t / p) * 100));
+      requestAnimationFrame(function () { requestAnimationFrame(function () { fl.style.width = pct + "%"; }); });
+    }
+    if (it.shopNote) c.append(el("div", "verdict", it.shopNote));
+    if (it.notes) c.append(el("div", "notes", it.notes));
+
+    var foot = el("div", "foot"), shops = el("div", "shops");
+    shopLinks(it).forEach(function (x) { var a = el("a", null, x[0]); a.href = x[1]; a.target = "_blank"; a.rel = "noopener"; shops.append(a); });
+    foot.append(shops);
+    var acts = el("div", "acts");
+    if (s.checked) acts.append(el("span", "when", ago(s.checked)));
+    var b1 = el("button", "btn small", it.bought ? "Watch again" : "Bought"); b1.type = "button";
+    b1.onclick = function () { it.bought = !it.bought; save(it, it.bought ? "Marked as bought" : "Back on the list"); };
+    var b2 = el("button", "btn small", "Edit"); b2.type = "button"; b2.onclick = function () { startEdit(it); };
+    var b3 = el("button", "btn small danger", pendingDelete === it.id ? "Tap to confirm" : "Remove"); b3.type = "button";
+    b3.onclick = function () {
+      if (pendingDelete === it.id) { pendingDelete = null; D.wishlist = D.wishlist.filter(function (i) { return i !== it; }); remove(it, "Removed"); }
+      else { pendingDelete = it.id; renderItems(); setTimeout(function () { if (pendingDelete === it.id) { pendingDelete = null; renderItems(); } }, 4000); }
+    };
+    acts.append(b1, b2, b3); foot.append(acts); c.append(foot);
+    return c;
+  }
+
+  function renderHits() {
+    var box = $("hits"); box.textContent = "";
+    var hs = (D.hits || []).slice(0, 24);
+    if (!hs.length) { box.append(el("div", "empty", "No hits yet. New ones show up here after a check.")); return; }
+    hs.forEach(function (h) {
+      var c = el("div", "hit");
+      var img = h.image || "";
+      if (img) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = img; im.onerror = function () { im.remove(); }; c.append(im); }
+      var b = el("div", "b");
+      var a = el("a", null, h.name); if (/^https:\/\//.test(h.url || "")) { a.href = h.url; a.target = "_blank"; a.rel = "noopener"; }
+      b.append(a, el("div", "pr", zl(h.price)), el("div", "m", [h.city, ago(h.time)].filter(Boolean).join(" · ")));
+      if (h.verdict) b.append(el("div", "v", h.verdict));
+      c.append(b); box.append(c);
+    });
+  }
+
+  function renderSearches() {
+    var box = $("searches"); box.textContent = "";
+    (D.searches || []).forEach(function (s) {
+      var st = D.status["search-" + s.id] || {}, r = el("div", "srch");
+      r.append(el("b", null, s.name), el("span", null, zl(s.min) + " – " + zl(s.max) + (st.checked ? " · checked " + ago(st.checked) : "")));
+      var a = el("a", null, "Open on OLX →");
+      a.href = "https://www.olx.pl/oferty/q-" + encodeURIComponent(String(s.query).replace(/ /g, "-")) + "/?search%5Border%5D=created_at:desc&search%5Bfilter_float_price:from%5D=" + s.min + "&search%5Bfilter_float_price:to%5D=" + s.max;
+      a.target = "_blank"; a.rel = "noopener"; r.append(a); box.append(r);
+    });
+    if (!box.children.length) box.append(el("span", "checked", "No OLX searches."));
+  }
+
+  function renderAll() { renderItems(); renderHits(); renderSearches(); }
+
+  function load() {
+    return DB.loadAll().then(function (d) {
+      D = d;
+      var by = d.runner ? " · checked by " + d.runner + (d.lastRun ? " " + ago(d.lastRun) : "") : "";
+      setSync("Synced" + by, true); if (!editing()) renderAll();
+    }).catch(function (e) { setSync("Offline. Retrying…", false); console.warn(e); });
+  }
+  function editing() { return !$("addBox").hidden; }
+  function save(it, msg) {
+    return DB.saveItem(it).then(function () { toast(msg); renderAll(); return true; })
+      .catch(function (e) { toast("Couldn't save: " + (e.message || e)); return false; });
+  }
+  function remove(it, msg) {
+    return DB.deleteItem(it.id).then(function () { toast(msg); renderAll(); })
+      .catch(function (e) { toast("Couldn't remove: " + (e.message || e)); load(); });
+  }
+
+  function openSheet() { $("addBox").hidden = false; $("addBox").scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(function () { $("fName").focus(); }, 250); }
+  function closeSheet() { resetForm(); $("addBox").hidden = true; renderAll(); }
+  function resetForm() { $("form").reset(); $("fId").value = ""; $("fSubmit").textContent = "Add to list"; $("addTitle").textContent = "Add something"; }
+  function startEdit(it) {
+    resetForm();
+    $("fId").value = it.id; $("fName").value = it.name || ""; $("fUrl").value = it.url || "";
+    (it.kind === "want" ? $("fKindWant") : $("fKindNeed")).checked = true;
+    $("fCat").value = it.category || "other"; $("fTarget").value = it.target ?? ""; $("fMax").value = it.max ?? "";
+    $("fPrio").value = String(it.priority || 2); $("fSize").value = it.size || ""; $("fUsed").value = it.used || "yes"; $("fNotes").value = it.notes || "";
+    $("fSubmit").textContent = "Save changes"; $("addTitle").textContent = "Edit item";
+    openSheet();
+  }
+  $("openAdd").onclick = function () { resetForm(); openSheet(); };
+  $("closeAdd").onclick = closeSheet; $("fCancel").onclick = closeSheet;
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var data = {
+      name: $("fName").value.trim(), url: $("fUrl").value.trim(), kind: $("fKindWant").checked ? "want" : "need", category: $("fCat").value,
+      target: num($("fTarget").value), max: num($("fMax").value), priority: parseInt($("fPrio").value, 10) || 2,
+      size: $("fSize").value.trim(), used: $("fUsed").value, notes: $("fNotes").value.trim()
+    };
+    if (!data.name) return;
+    var id = $("fId").value, it = D.wishlist.find(function (i) { return i.id === id; }), isNew = !it;
+    if (isNew) {
+      it = { id: (data.name.toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "item") + "-" + Date.now().toString(36).slice(-4), added: new Date().toISOString().slice(0, 10), bought: false };
+      D.wishlist.push(it);
+    }
+    Object.assign(it, data);
+    $("addBox").hidden = true; resetForm();
+    save(it, isNew ? "Added" + (window.Checker && data.url ? ". Checking it now…" : "") : "Saved").then(function (ok) { if (ok && isNew && data.url && window.Checker) check(true); });
+  });
+  function check(quiet) {
+    if (!window.Checker) { toast("Checks run on your Mac or PC every 15 minutes"); return; }
+    if (!quiet) toast("Checking now… updates in a minute or two");
+    Checker.runOnce(true).then(function (r) { if (!quiet) toast("Check done: " + r); load(); });
+  }
+  $("checkBtn").onclick = function () { check(false); };
+
+  document.querySelectorAll(".chips button").forEach(function (b) {
+    b.onclick = function () {
+      filter = b.dataset.f;
+      document.querySelectorAll(".chips button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      renderItems();
+    };
+  });
+
+  // Login + settings
+  function showLogin(on) { $("login").hidden = !on; }
+  function afterLogin() {
+    showLogin(false); load(); DB.onChange(load);
+    DB.getSetting("ntfy").then(function (v) { $("sNtfy").value = v || ""; });
+    if (window.okazje) window.okazje.device().then(function (d) { $("sDev").textContent = "This computer: " + d + " (checks every 15 min)"; });
+    else $("sDev").textContent = "Website mode: checks run on your Mac or PC.";
+  }
+  $("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault(); $("lErr").textContent = "";
+    DB.login($("lEmail").value.trim(), $("lPw").value).then(afterLogin).catch(function (x) { $("lErr").textContent = x.message || "Couldn't log in"; });
+  });
+  $("lSignup").onclick = function () {
+    if (!$("loginForm").reportValidity()) return;
+    DB.signup($("lEmail").value.trim(), $("lPw").value).then(function (d) {
+      if (d.session) { DB.uid = d.user.id; afterLogin(); } else $("lErr").textContent = "Check your email to confirm, then log in.";
+    }).catch(function (x) { $("lErr").textContent = x.message || "Couldn't create the account"; });
+  };
+  $("sSave").onclick = function () { DB.setSetting("ntfy", $("sNtfy").value.trim()).then(function () { toast("Saved"); }).catch(function (e) { toast(e.message); }); };
+  $("sLogout").onclick = function () { DB.logout().then(function () { location.reload(); }); };
+  $("sImport").onclick = function () { $("sFile").click(); };
+  $("sFile").onchange = function () {
+    var f = $("sFile").files[0]; if (!f) return;
+    f.text().then(function (t) { var o = JSON.parse(t.replace(/^\uFEFF/, "")); if (Array.isArray(o)) o = { wishlist: o }; return DB.importOld(o); })
+      .then(function (n) { toast("Imported (" + n + " parts)"); load(); }).catch(function (e) { toast("Import failed: " + (e.message || e)); });
+    $("sFile").value = "";
+  };
+
+  if (window.okazje && window.okazje.platform === "darwin") document.body.classList.add("mac-app");
+  if (!window.Checker) $("checkBtn").hidden = true;   // website: checks run on the computers
+  renderCalendar(); renderAll();
+  DB.session().then(function (s) { if (s) afterLogin(); else showLogin(true); });
+  setInterval(function () { if (DB.uid) load(); }, 60000);
+})();
+</script>
+</body></html>

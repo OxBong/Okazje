@@ -1,0 +1,34 @@
+{
+  "name": "okazje",
+  "productName": "Okazje",
+  "version": "1.0.0",
+  "description": "Okazje price checker",
+  "main": "main.js",
+  "author": "OxBing",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "pl.okazje.app",
+    "productName": "Okazje",
+    "files": ["main.js", "preload.js", "web/**/*", "assets/**/*", "build/icon.png"],
+    "directories": { "buildResources": "build", "output": "dist" },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.shopping",
+      "identity": null,
+      "extendInfo": { "LSUIElement": false }
+    },
+    "dmg": { "title": "Okazje" },
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon-win.png" },
+    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "runAfterFinish": true, "shortcutName": "Okazje" }
+  }
+}
