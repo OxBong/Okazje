@@ -5,7 +5,8 @@
   var B = window.okazje;
   if (!B) return;
   var sb = window.DB.sb;
-  var running = false;
+  var running = false, sizesText = "";
+  var CLOTHES = /clothes|shoe|sneaker|buty|hoodie|bluza|jeans|spodnie|kurtka|jacket|t-?shirt|koszul|czapk|cap\b|boxer/i;
   function must(r) { if (r.error) throw r.error; return r.data; }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function nowIso() { return new Date().toISOString(); }
@@ -39,6 +40,7 @@
     var id = await storeHit(key, h);
     if (!id) return false;                       // another computer already reported it
     var crit = h.criteria || (h.name + ", target price " + h.target + " zł, new from a legit Polish shop");
+    if (sizesText && (h.clothes || CLOTHES.test(h.name))) crit += ". Buyer's sizes: " + sizesText + ". Say if the listed size likely fits.";
     try { h.verdict = await B.verdict(h, crit); } catch (e) { h.verdict = null; }
     if (h.verdict && /^SKIP/.test(h.verdict) && /Apple Watch/.test(h.name)) {   // junk watch listings: drop silently
       await sb.from("hits").delete().eq("id", id); return false;
@@ -65,7 +67,7 @@
           e.price = price; e.ok = true;
           var hit = (it.target && price <= it.target) || (!it.target && e.lastPrice && price <= 0.95 * e.lastPrice);
           if (hit && price !== e.lastPrice) {
-            if (await newHit(topic, it.id + ":" + price, { name: it.name, price: price, target: it.target, was: e.lastPrice, url: it.url, image: img, desc: e.lastPrice ? "Was " + e.lastPrice + " zł" : "" })) n++;
+            if (await newHit(topic, it.id + ":" + price, { name: it.name, clothes: it.category === "clothes", criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł, new from a legit Polish shop" + (it.notes ? ". Notes: " + it.notes : ""), price: price, target: it.target, was: e.lastPrice, url: it.url, image: img, desc: e.lastPrice ? "Was " + e.lastPrice + " zł" : "" })) n++;
           }
         } else { fails++; if (fails <= 3) B.log("no price found: " + it.name); }
       } catch (ex) { fails++; if (fails <= 3) B.log("failed (" + ex + "): " + it.name); }
@@ -125,6 +127,8 @@
       if (!mine && force) await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
       var d = await window.DB.loadAll();
       var topic = await window.DB.getSetting("ntfy");
+      var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
+      sizesText = sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "";
       var n = await checkItems(topic, d.wishlist, d.status) + await checkSearches(topic, d.searches);
       await sb.from("runner").update({ beat: nowIso() }).eq("user_id", window.DB.uid);
       if (topic) B.fetchText("https://ntfy.sh/" + topic + "-hb", { method: "POST", body: "up" }).catch(function () {});

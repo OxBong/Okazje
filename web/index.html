@@ -31,6 +31,8 @@ h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 .login .row button { flex: 1; justify-content: center; }
 .set { display: grid; gap: 10px; }
 .set label { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+.sizes { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.sizes label.wide { grid-column: 1 / -1; }
 .set .row { display: flex; gap: 8px; flex-wrap: wrap; }
 body.mac-app .top { padding-top: 34px; -webkit-app-region: drag; }
 body.mac-app .top button, body.mac-app .top a { -webkit-app-region: no-drag; }
@@ -240,6 +242,11 @@ textarea { resize: vertical; min-height: 44px; }
 
   <aside class="side-col">
     <section class="card"><h2>OLX searches</h2><div id="searches"></div></section>
+    <section class="card"><h2>My sizes</h2>
+      <div class="set sizes" id="sizes"></div>
+      <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="szSave">Save sizes</button></div>
+      <span class="checked">Used by Claude when judging clothes and shoes deals.</span></div>
+    </section>
     <section class="card"><h2>Settings</h2>
       <div class="set">
         <label>Phone alerts topic (ntfy)<input id="sNtfy" type="text" autocomplete="off" spellcheck="false" placeholder="your-ntfy-topic"></label>
@@ -515,11 +522,35 @@ textarea { resize: vertical; min-height: 44px; }
     };
   });
 
+  // My sizes (stored in settings "sizes"; first time filled with the profile Claude already knew)
+  var SIZE_FIELDS = [["height","Height"],["chest","Chest"],["shoulders","Shoulders"],["waist","Waist",1],["sleeve","Sleeve"],
+    ["shoes","Shoes"],["tees","T-shirts",1],["hoodies","Hoodies / sweaters"],["jeans","Jeans",1],["sweatpants","Sweatpants"],
+    ["jackets","Jackets",1],["blazers","Blazers"],["shirts","Dress shirts"],["caps","Caps",1],["style","Style / fit notes",1]];
+  var SIZE_DEFAULTS = { height: "183 cm", chest: "86 cm", shoulders: "48 cm", waist: "70 cm natural, 80 cm waistband", sleeve: "61 cm",
+    shoes: "EU 44 (D width)", tees: "M boxy / L oversized, heavyweight", hoodies: "XL oversized", jeans: "Loose fit: H&M 28/32, Pull&Bear EU 40 (~W29-30)",
+    sweatpants: "S", jackets: "L (M in oversized streetwear brands)", blazers: "EU 46 / 36R", shirts: "42 cm collar", caps: "New Era 9FORTY style",
+    style: "Relaxed streetwear on plain blanks, no loud logos. Navy, heather grey, washed black, light denim. Vinted OK for clothes, never shoes." };
+  function renderSizes(v) {
+    $("sizes").innerHTML = SIZE_FIELDS.map(function (f) {
+      return '<label' + (f[2] ? ' class="wide"' : '') + '>' + f[1] + '<input data-k="' + f[0] + '" type="text" autocomplete="off"></label>';
+    }).join("");
+    $("sizes").querySelectorAll("input").forEach(function (i) { i.value = (v && v[i.dataset.k]) || ""; });
+  }
+  function readSizes() { var o = {}; $("sizes").querySelectorAll("input").forEach(function (i) { if (i.value.trim()) o[i.dataset.k] = i.value.trim(); }); return o; }
+  function loadSizes() {
+    DB.getSetting("sizes").then(function (v) {
+      if (!v) { v = SIZE_DEFAULTS; DB.setSetting("sizes", v).catch(function () {}); }
+      renderSizes(v);
+    });
+  }
+  $("szSave").onclick = function () { DB.setSetting("sizes", readSizes()).then(function () { toast("Sizes saved"); }).catch(function (e) { toast(e.message); }); };
+
   // Login + settings
   function showLogin(on) { $("login").hidden = !on; }
   function afterLogin() {
     showLogin(false); load(); DB.onChange(load);
     DB.getSetting("ntfy").then(function (v) { $("sNtfy").value = v || ""; });
+    loadSizes();
     if (window.okazje) window.okazje.device().then(function (d) { $("sDev").textContent = "This computer: " + d + " (checks every 15 min)"; });
     else $("sDev").textContent = "Website mode: checks run on your Mac or PC.";
   }
