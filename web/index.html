@@ -22,6 +22,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 [hidden] { display: none !important; }
 .login { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; padding: 16px; }
+body.locked > :not(.login) { display: none !important; }
+body.locked .login { position: static; min-height: 100vh; min-height: 100dvh; }
 .login form { width: 100%; max-width: 360px; display: grid; grid-template-columns: minmax(0,1fr); gap: 12px; }
 .login h1 { font-size: 28px; font-weight: 800; }
 .login p { color: var(--muted); margin: 0; }
@@ -180,7 +182,7 @@ a.btn { text-decoration: none; display: inline-block; }
   .s3, .s2 { grid-column: span 6; } .brand h1 { font-size: 18px; } .add-btn { padding: 8px 12px; } .price .big { font-size: 27px; }
 }
 </style></head>
-<body>
+<body class="locked">
 <div class="login" id="login" hidden>
   <form id="loginForm">
     <h1>Okazje</h1>
@@ -610,7 +612,7 @@ a.btn { text-decoration: none; display: inline-block; }
   initApp();
 
   // Login + settings
-  function showLogin(on) { $("login").hidden = !on; }
+  function showLogin(on) { $("login").hidden = !on; document.body.classList.toggle("locked", on); }
   function afterLogin() {
     showLogin(false); load(); DB.onChange(load);
     DB.getSetting("ntfy").then(function (v) { $("sNtfy").value = v || ""; });
