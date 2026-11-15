@@ -57,6 +57,15 @@ body.mac-app .top button, body.mac-app .top a { -webkit-app-region: no-drag; }
 .sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
 .sync.ok i { background: var(--good); }
 .topbtns { display: flex; gap: 8px; }
+.topbtns .add-btn { white-space: nowrap; }
+.add-btn.icon { padding-left: 12px; padding-right: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.setp { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; padding: 16px; }
+.setp[hidden] { display: none; }
+body.mac-app .setp { padding-top: 40px; }
+.setp-top { max-width: 1120px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: space-between; }
+.setp-top h2 { font-size: 22px; font-weight: 800; }
+.setp-grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 420px) { .setp-grid { grid-template-columns: minmax(0,1fr); } }
 .add-btn { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 9px 16px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: transform .15s; }
 .add-btn.ghost { background: var(--soft); color: var(--ink); }
 .add-btn:active { transform: scale(.97); }
@@ -213,12 +222,64 @@ a.btn { text-decoration: none; display: inline-block; }
     <div class="row"><button class="add-btn" type="submit">Log in</button><button class="add-btn ghost" type="button" id="lSignup">Create account</button></div>
   </form>
 </div>
+<div class="setp" id="setPanel" hidden>
+  <div class="setp-top"><h2>Settings</h2><button class="btn small" type="button" id="setClose">Close</button></div>
+  <div class="setp-grid">
+    <section class="card" id="appCard" hidden><h2>App</h2>
+      <div class="set" id="appSet">
+        <span class="checked" id="aVer"></span>
+        <label class="chk"><input type="checkbox" id="aAuto"> Update automatically when the app starts</label>
+        <div class="row"><button class="btn small" type="button" id="aUpd">Check for updates</button></div>
+        <span class="checked" id="aUpdMsg"></span>
+        <h3 class="sub">Claude opinions</h3>
+        <label>How Claude writes the BUY / MAYBE / SKIP opinion
+          <select id="aMode">
+            <option value="cli">My Claude account</option>
+            <option value="api">API key (pay per use)</option>
+            <option value="off">Off (no opinions)</option>
+          </select></label>
+        <div id="aCli" class="set">
+          <span class="checked" id="aCliMsg"></span>
+          <div class="row">
+            <button class="btn small" type="button" id="aInstall">Install Claude</button>
+            <button class="btn small" type="button" id="aLogin">Log in to Claude</button>
+          </div>
+        </div>
+        <div id="aApi" class="set" hidden>
+          <label>API key (stored encrypted on this computer only)<input id="aKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
+          <div class="row"><button class="btn small" type="button" id="aKeySave">Save key</button>
+          <a class="btn small" href="https://console.anthropic.com/settings/keys" target="_blank">Get a key</a></div>
+        </div>
+        <div class="row"><button class="btn small" type="button" id="aTest">Test Claude</button></div>
+        <span class="checked" id="aMsg"></span>
+      </div>
+    </section>
+    <section class="card"><h2>My sizes</h2>
+      <div class="set sizes" id="sizes"></div>
+      <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="szSave">Save sizes</button></div>
+      <span class="checked">Used by Claude when judging clothes and shoes deals.</span></div>
+    </section>
+    <section class="card"><h2>Account &amp; phone alerts</h2>
+      <div class="set">
+        <label>Phone alerts topic (ntfy)<input id="sNtfy" type="text" autocomplete="off" spellcheck="false" placeholder="your-ntfy-topic"></label>
+        <div class="row">
+          <button class="btn small" type="button" id="sSave">Save topic</button>
+          <button class="btn small" type="button" id="sImport">Import old wishlist</button>
+          <button class="btn small danger" type="button" id="sLogout">Log out</button>
+        </div>
+        <input type="file" id="sFile" accept=".json,application/json" hidden>
+        <span class="checked" id="sDev"></span>
+      </div>
+    </section>
+  </div>
+</div>
 <div class="top"><div class="top-in">
   <div class="brand">
     <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="8" cy="8" r="1.4" fill="#fff"/></svg></div>
     <div style="min-width:0"><h1>Okazje</h1><span class="sync" id="sync"><i></i><span id="syncT">Connecting…</span></span></div>
   </div>
   <div class="topbtns">
+    <button class="add-btn ghost icon" id="setOpen" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
     <button class="add-btn ghost" id="checkBtn" type="button">Check now</button>
     <button class="add-btn" id="openAdd" type="button"><span aria-hidden="true">+</span> Add</button>
   </div>
@@ -275,52 +336,6 @@ a.btn { text-decoration: none; display: inline-block; }
       <form class="cin" id="cForm"><textarea id="cText" rows="2" placeholder="e.g. I want a plain black heavyweight hoodie, up to 150 zł"></textarea><button class="btn primary small" id="cSend">Send</button></form>
     </section>
     <section class="card"><h2>OLX searches</h2><div id="searches"></div></section>
-    <section class="card" id="appCard" hidden><h2>App</h2>
-      <div class="set" id="appSet">
-        <span class="checked" id="aVer"></span>
-        <label class="chk"><input type="checkbox" id="aAuto"> Update automatically when the app starts</label>
-        <div class="row"><button class="btn small" type="button" id="aUpd">Check for updates</button></div>
-        <span class="checked" id="aUpdMsg"></span>
-        <h3 class="sub">Claude opinions</h3>
-        <label>How Claude writes the BUY / MAYBE / SKIP opinion
-          <select id="aMode">
-            <option value="cli">My Claude account</option>
-            <option value="api">API key (pay per use)</option>
-            <option value="off">Off (no opinions)</option>
-          </select></label>
-        <div id="aCli" class="set">
-          <span class="checked" id="aCliMsg"></span>
-          <div class="row">
-            <button class="btn small" type="button" id="aInstall">Install Claude</button>
-            <button class="btn small" type="button" id="aLogin">Log in to Claude</button>
-          </div>
-        </div>
-        <div id="aApi" class="set" hidden>
-          <label>API key (stored encrypted on this computer only)<input id="aKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
-          <div class="row"><button class="btn small" type="button" id="aKeySave">Save key</button>
-          <a class="btn small" href="https://console.anthropic.com/settings/keys" target="_blank">Get a key</a></div>
-        </div>
-        <div class="row"><button class="btn small" type="button" id="aTest">Test Claude</button></div>
-        <span class="checked" id="aMsg"></span>
-      </div>
-    </section>
-    <section class="card"><h2>My sizes</h2>
-      <div class="set sizes" id="sizes"></div>
-      <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="szSave">Save sizes</button></div>
-      <span class="checked">Used by Claude when judging clothes and shoes deals.</span></div>
-    </section>
-    <section class="card"><h2>Settings</h2>
-      <div class="set">
-        <label>Phone alerts topic (ntfy)<input id="sNtfy" type="text" autocomplete="off" spellcheck="false" placeholder="your-ntfy-topic"></label>
-        <div class="row">
-          <button class="btn small" type="button" id="sSave">Save topic</button>
-          <button class="btn small" type="button" id="sImport">Import old wishlist</button>
-          <button class="btn small danger" type="button" id="sLogout">Log out</button>
-        </div>
-        <input type="file" id="sFile" accept=".json,application/json" hidden>
-        <span class="checked" id="sDev"></span>
-      </div>
-    </section>
     <section class="card"><h2>Sale calendar</h2><ul class="cal" id="cal"></ul></section>
     <section class="card"><h2>Paying less in Poland</h2>
       <ol class="tips">
@@ -732,6 +747,11 @@ a.btn { text-decoration: none; display: inline-block; }
   });
   $("cText").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("cForm").requestSubmit(); } });
   $("cNew").onclick = function () { if (!chatBusy) { chat = []; saveChat(); } };
+  renderChat();
+
+  $("setOpen").onclick = function () { $("setPanel").hidden = false; document.body.style.overflow = "hidden"; };
+  $("setClose").onclick = function () { $("setPanel").hidden = true; document.body.style.overflow = ""; };
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("setPanel").hidden) $("setClose").onclick(); });
 
   // Login + settings
   function showLogin(on) { $("login").hidden = !on; document.body.classList.toggle("locked", on); }
