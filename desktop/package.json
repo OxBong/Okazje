@@ -18,17 +18,55 @@
   "build": {
     "appId": "pl.okazje.app",
     "productName": "Okazje",
-    "files": ["main.js", "preload.js", "web/**/*", "assets/**/*", "build/icon.png"],
-    "directories": { "buildResources": "build", "output": "dist" },
+    "files": [
+      "main.js",
+      "preload.js",
+      "web/**/*",
+      "assets/**/*",
+      "build/icon.png"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.shopping",
       "identity": "-",
-      "extendInfo": { "LSUIElement": false }
+      "extendInfo": {
+        "LSUIElement": false
+      },
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
-    "dmg": { "title": "Okazje" },
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon-win.png" },
-    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "runAfterFinish": true, "shortcutName": "Okazje" }
+    "dmg": {
+      "title": "Okazje"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon-win.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true,
+      "shortcutName": "Okazje"
+    }
   }
 }
