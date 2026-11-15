@@ -33,6 +33,12 @@ h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 .set label { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
 .sizes { grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-auto-flow: row dense; }
 .sizes label.wide { grid-column: 1 / -1; }
+.set .chk { display: flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; }
+.set .chk input { width: auto; }
+.set h3.sub { font-size: 14px; font-weight: 700; margin-top: 8px; }
+.set select { font-size: 15px; }
+.set[hidden], #appCard[hidden] { display: none; }
+.set .checked { white-space: normal; }
 .set .row { display: flex; gap: 8px; flex-wrap: wrap; }
 body.mac-app .top { padding-top: 34px; -webkit-app-region: drag; }
 body.mac-app .top button, body.mac-app .top a { -webkit-app-region: no-drag; }
@@ -88,6 +94,7 @@ textarea { resize: vertical; min-height: 44px; }
 .actions { grid-column: span 6; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 .btn { border: 0; background: var(--soft); padding: 10px 16px; border-radius: 12px; cursor: pointer; font-weight: 600; }
 .btn:hover { background: var(--line); }
+a.btn { text-decoration: none; display: inline-block; }
 .btn.primary { background: var(--accent); color: #fff; }
 .btn.small { padding: 7px 12px; font-size: 13px; border-radius: 10px; }
 .btn.danger { color: var(--bad); }
@@ -242,6 +249,35 @@ textarea { resize: vertical; min-height: 44px; }
 
   <aside class="side-col">
     <section class="card"><h2>OLX searches</h2><div id="searches"></div></section>
+    <section class="card" id="appCard" hidden><h2>App</h2>
+      <div class="set" id="appSet">
+        <span class="checked" id="aVer"></span>
+        <label class="chk"><input type="checkbox" id="aAuto"> Update automatically when the app starts</label>
+        <div class="row"><button class="btn small" type="button" id="aUpd">Check for updates</button></div>
+        <span class="checked" id="aUpdMsg"></span>
+        <h3 class="sub">Claude opinions</h3>
+        <label>How Claude writes the BUY / MAYBE / SKIP opinion
+          <select id="aMode">
+            <option value="cli">My Claude account</option>
+            <option value="api">API key (pay per use)</option>
+            <option value="off">Off (no opinions)</option>
+          </select></label>
+        <div id="aCli" class="set">
+          <span class="checked" id="aCliMsg"></span>
+          <div class="row">
+            <button class="btn small" type="button" id="aInstall">Install Claude</button>
+            <button class="btn small" type="button" id="aLogin">Log in to Claude</button>
+          </div>
+        </div>
+        <div id="aApi" class="set" hidden>
+          <label>API key (stored encrypted on this computer only)<input id="aKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…"></label>
+          <div class="row"><button class="btn small" type="button" id="aKeySave">Save key</button>
+          <a class="btn small" href="https://console.anthropic.com/settings/keys" target="_blank">Get a key</a></div>
+        </div>
+        <div class="row"><button class="btn small" type="button" id="aTest">Test Claude</button></div>
+        <span class="checked" id="aMsg"></span>
+      </div>
+    </section>
     <section class="card"><h2>My sizes</h2>
       <div class="set sizes" id="sizes"></div>
       <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="szSave">Save sizes</button></div>
@@ -544,6 +580,34 @@ textarea { resize: vertical; min-height: 44px; }
     });
   }
   $("szSave").onclick = function () { DB.setSetting("sizes", readSizes()).then(function () { toast("Sizes saved"); }).catch(function (e) { toast(e.message); }); };
+
+  // App card (desktop app only): updates and the Claude connection
+  function initApp() {
+    var B = window.okazje; if (!B) return;
+    $("appCard").hidden = false;
+    if (!B.appInfo) { $("appSet").innerHTML = '<span class="checked">This version is too old for these settings. <a href="https://github.com/OxBong/Okazje/releases/latest" target="_blank">Download the newest app</a> once; after that it updates itself.</span>'; return; }
+    function msg(id, t) { $(id).textContent = t; }
+    function busy(btn, p, id) { var b = $(btn); b.disabled = true; msg(id, "Working…"); return p.then(function (t) { msg(id, t); }).catch(function (e) { msg(id, e.message || String(e)); }).finally(function () { b.disabled = false; refresh(); }); }
+    function refresh() {
+      B.appInfo().then(function (i) {
+        msg("aVer", "Version: build " + (i.build || "dev") + (i.latest && i.latest > i.build ? " · build " + i.latest + " available" : ""));
+        $("aAuto").checked = i.autoUpdate; $("aMode").value = i.claudeMode;
+        $("aCli").hidden = i.claudeMode !== "cli"; $("aApi").hidden = i.claudeMode !== "api"; $("aTest").parentNode.hidden = i.claudeMode === "off";
+        msg("aCliMsg", i.claudePath ? "Claude Code is installed. If Test says you're not logged in, click Log in." : "Claude Code isn't installed on this computer yet.");
+        $("aInstall").hidden = !!i.claudePath;
+        $("aKey").placeholder = i.hasKey ? "Key saved ✓ (type a new one to replace)" : "sk-ant-…";
+      });
+    }
+    $("aAuto").onchange = function () { B.setPref("autoUpdate", $("aAuto").checked); };
+    $("aMode").onchange = function () { B.setPref("claudeMode", $("aMode").value).then(refresh); msg("aMsg", ""); };
+    $("aUpd").onclick = function () { busy("aUpd", B.checkUpdate(), "aUpdMsg"); };
+    $("aInstall").onclick = function () { busy("aInstall", B.claudeInstall(), "aMsg"); };
+    $("aLogin").onclick = function () { busy("aLogin", B.claudeLogin(), "aMsg"); };
+    $("aTest").onclick = function () { busy("aTest", B.claudeTest(), "aMsg"); };
+    $("aKeySave").onclick = function () { busy("aKeySave", B.setApiKey($("aKey").value).then(function () { $("aKey").value = ""; return "Key saved. Click Test Claude."; }), "aMsg"); };
+    refresh();
+  }
+  initApp();
 
   // Login + settings
   function showLogin(on) { $("login").hidden = !on; }

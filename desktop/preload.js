@@ -7,5 +7,12 @@ contextBridge.exposeInMainWorld("okazje", {
   notify: (title, body) => ipcRenderer.invoke("notify", title, body),
   device: () => ipcRenderer.invoke("device"),
   log: (msg) => ipcRenderer.invoke("log", msg),
+  appInfo: () => ipcRenderer.invoke("appInfo"),
+  setPref: (k, v) => ipcRenderer.invoke("setPref", k, v),
+  setApiKey: (k) => ipcRenderer.invoke("setApiKey", k),
+  checkUpdate: () => ipcRenderer.invoke("checkUpdate"),
+  claudeTest: () => ipcRenderer.invoke("claudeTest"),
+  claudeInstall: () => ipcRenderer.invoke("claudeInstall"),
+  claudeLogin: () => ipcRenderer.invoke("claudeLogin"),
   onWake: (cb) => ipcRenderer.on("wake", () => cb())
 });

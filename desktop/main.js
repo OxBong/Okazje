@@ -1,6 +1,6 @@
 // Okazje desktop app (Mac + Windows). Shows the wishlist window, lives in the tray / menu bar,
 // starts at login and runs the 15-minute checker in the background.
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, Notification, powerMonitor, net, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, Notification, powerMonitor, net, nativeImage, safeStorage } = require("electron");
 const path = require("path"), fs = require("fs"), os = require("os"), { spawn } = require("child_process");
 
 const WEB_URL = "https://oxbong.github.io/Okazje/";
@@ -16,6 +16,15 @@ app.on("second-instance", () => show());
 const dataDir = () => app.getPath("userData");
 function log(msg) {
   try { fs.appendFileSync(path.join(dataDir(), "log.txt"), `${new Date().toISOString().slice(0, 16).replace("T", " ")} ${msg}\n`); } catch {}
+}
+
+// Local app preferences (this computer only). The API key is encrypted with the system keychain.
+const prefsFile = () => path.join(dataDir(), "prefs.json");
+function prefs() { try { return Object.assign({ autoUpdate: true, claudeMode: "cli" }, JSON.parse(fs.readFileSync(prefsFile(), "utf8"))); } catch { return { autoUpdate: true, claudeMode: "cli" }; } }
+function setPref(k, v) { const p = prefs(); p[k] = v; fs.writeFileSync(prefsFile(), JSON.stringify(p)); }
+function apiKey() {
+  const enc = prefs().apiKey; if (!enc) return null;
+  try { return safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(enc, "base64")) : null; } catch { return null; }
 }
 
 function createWindow() {
@@ -101,21 +110,32 @@ function findClaude() {
   return c.find((p) => p && fs.existsSync(p)) || null;
 }
 async function verdict(hit, criteria) {
-  const exe = findClaude();
-  if (!exe) return null;
+  const mode = prefs().claudeMode;
+  if (mode === "off") return null;
+  if (mode === "api" ? !apiKey() : !findClaude()) return null;
   const capFile = path.join(dataDir(), "claude-count.json"), today = new Date().toISOString().slice(0, 10);
   let cap = { day: today, n: 0 };
   try { const c = JSON.parse(fs.readFileSync(capFile, "utf8")); if (c.day === today) cap = c; } catch {}
   if (cap.n >= 10) return null;
   cap.n++; fs.writeFileSync(capFile, JSON.stringify(cap));
 
-  let prompt = `You judge a deal for a student in Poland. Reply in max 3 short sentences, English, no markdown. Start with BUY, MAYBE or SKIP, then why, and a fair offer price in zl if it's a used listing. Flag scam signs. Don't claim a defect you can't clearly see; say "looks like" when unsure.
+  const out = mode === "api" ? await askApi(hit, criteria) : await askCli(hit, criteria);
+  if (!/^(BUY|MAYBE|SKIP)/.test(out)) { if (out) log("claude error: " + out.slice(0, 300)); return null; }
+  return out.length > 300 ? out.slice(0, 300) + "..." : out;
+}
+function basePrompt(hit, criteria) {
+  return `You judge a deal for a student in Poland. Reply in max 3 short sentences, English, no markdown. Start with BUY, MAYBE or SKIP, then why, and a fair offer price in zl if it's a used listing. Flag scam signs. Don't claim a defect you can't clearly see; say "looks like" when unsure.
 Buyer wants: ${criteria}
 Listing: ${hit.name}
 Price: ${hit.price} zl${hit.city ? " in " + hit.city : ""}
 Description: ${hit.fullDesc || hit.desc || ""}
 Link: ${hit.url}
 `;
+}
+// Claude Code on this computer (uses the Claude subscription it's logged in with)
+async function askCli(hit, criteria) {
+  const exe = findClaude(); if (!exe) return "";
+  let prompt = basePrompt(hit, criteria);
   const pdir = path.join(os.tmpdir(), "okazje-photos");
   fs.rmSync(pdir, { recursive: true, force: true }); fs.mkdirSync(pdir, { recursive: true });
   const files = [];
@@ -136,23 +156,87 @@ Link: ${hit.url}
     p.on("close", () => { clearTimeout(t); resolve(txt.trim()); });
     p.stdin.end(prompt);
   });
-  if (!/^(BUY|MAYBE|SKIP)/.test(out)) { if (out) log("claude error: " + out.slice(0, 300)); return null; }
-  return out.length > 300 ? out.slice(0, 300) + "..." : out;
+  return out;
 }
+// Anthropic API key (no Claude Code needed; billed per use on console.anthropic.com)
+async function askApi(hit, criteria) {
+  const key = apiKey(); if (!key) return "";
+  const content = (hit.photos || []).slice(0, 6).map((u) => ({ type: "image", source: { type: "url", url: u } }));
+  content.push({ type: "text", text: basePrompt(hit, criteria) + (content.length ? "Photos of the listing are attached; look for battery health, specs screens, damage, charger, serial/iCloud hints." : "") });
+  try {
+    const r = await net.fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 300, messages: [{ role: "user", content }] })
+    });
+    const j = await r.json();
+    if (!r.ok) return "API error: " + ((j.error && j.error.message) || r.status);
+    return (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
+  } catch (e) { return "API error: " + e.message; }
+}
+
+// ---- Settings page helpers ----
+const TEST_HIT = { name: "Test: Sony DualSense controller, white", price: 199, url: "https://example.com", desc: "New, sealed, from a Polish shop." };
+ipcMain.handle("appInfo", () => {
+  const p = prefs();
+  return { build: BUILD, latest: latestBuild, platform: process.platform, autoUpdate: p.autoUpdate, claudeMode: p.claudeMode,
+    hasKey: !!p.apiKey, claudePath: findClaude(), canEncrypt: safeStorage.isEncryptionAvailable() };
+});
+ipcMain.handle("setPref", (_e, k, v) => { if (["autoUpdate", "claudeMode"].includes(k)) setPref(k, v); });
+ipcMain.handle("setApiKey", (_e, key) => {
+  key = String(key || "").trim();
+  if (!key) { setPref("apiKey", null); return true; }
+  if (!safeStorage.isEncryptionAvailable()) throw new Error("This computer can't store the key safely");
+  setPref("apiKey", safeStorage.encryptString(key).toString("base64")); return true;
+});
+ipcMain.handle("claudeTest", async () => {
+  const mode = prefs().claudeMode;
+  if (mode === "off") return "Claude opinions are turned off.";
+  if (mode === "api" && !apiKey()) return "No API key saved yet.";
+  if (mode === "cli" && !findClaude()) return "Claude Code isn't installed on this computer. Click Install Claude.";
+  const out = mode === "api" ? await askApi(TEST_HIT, "white DualSense, target 230 zł") : await askCli(TEST_HIT, "white DualSense, target 230 zł");
+  if (/^(BUY|MAYBE|SKIP)/.test(out)) return "Working ✓ " + out.slice(0, 160);
+  if (/log ?in|auth|credential|api key/i.test(out)) return "Claude isn't logged in. Click Log in to Claude.";
+  return "Not working: " + (out || "no answer").slice(0, 200);
+});
+ipcMain.handle("claudeInstall", () => new Promise((resolve) => {
+  const p = process.platform === "win32"
+    ? spawn("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "irm https://claude.ai/install.ps1 | iex"], { windowsHide: true })
+    : spawn("/bin/bash", ["-lc", "curl -fsSL https://claude.ai/install.sh | bash"]);
+  let out = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (out += d));
+  const t = setTimeout(() => { p.kill(); resolve("Install timed out."); }, 300000);
+  p.on("close", (c) => { clearTimeout(t); log("claude install: " + out.slice(-300)); resolve(findClaude() ? "Installed ✓ Now click Log in to Claude." : "Install failed: " + out.slice(-200)); });
+  p.on("error", (e) => { clearTimeout(t); resolve("Install failed: " + e.message); });
+}));
+// Claude's login needs its own window once; this opens it ready to go.
+ipcMain.handle("claudeLogin", () => {
+  const exe = findClaude(); if (!exe) return "Install Claude first.";
+  if (process.platform === "darwin") {
+    const cmd = `clear; echo 'Log in to Claude in the browser that opens. When it says you are logged in, close this window.'; "${exe}" /login`;
+    spawn("osascript", ["-e", `tell application "Terminal" to do script ${JSON.stringify(cmd)}`, "-e", 'tell application "Terminal" to activate']);
+  } else {
+    spawn("cmd.exe", ["/c", "start", "Claude login", "cmd", "/k", `echo Log in to Claude in the browser that opens. When done, close this window. && "${exe}" /login`], { windowsHide: false, shell: false });
+  }
+  return "A small login window opened. Finish there, then click Test.";
+});
+ipcMain.handle("checkUpdate", () => checkUpdate(true));
 
 // ---- Auto-update: checks GitHub releases on start and every 6 hours, installs a newer build by itself ----
 const BUILD = (() => { try { return require("./build-info.json").build; } catch { return 0; } })();
-let updating = false;
-async function checkUpdate() {
-  if (!BUILD || updating) return;
+let updating = false, latestBuild = null;
+async function checkUpdate(manual) {
+  if (!BUILD) return "Development copy, no updates.";
+  if (updating) return "Updating…";
+  if (!manual && !prefs().autoUpdate) return "";
   try {
     const r = await net.fetch("https://api.github.com/repos/OxBong/okazje/releases/latest", { headers: { "User-Agent": "Okazje" } });
-    if (!r.ok) return;
+    if (!r.ok) return "Couldn't check (GitHub " + r.status + ").";
     const rel = await r.json(), n = parseInt(String(rel.tag_name).replace("build-", ""), 10);
-    if (!(n > BUILD)) return;
+    latestBuild = n;
+    if (!(n > BUILD)) return "You have the newest version (build " + BUILD + ").";
     const ext = process.platform === "darwin" ? ".dmg" : ".exe";
     const asset = (rel.assets || []).find((a) => a.name.endsWith(ext));
-    if (!asset) return;
+    if (!asset) return "Build " + n + " is still being made, try again in a few minutes.";
     updating = true; log(`update: build ${BUILD} -> ${n}`);
     const f = path.join(os.tmpdir(), "okazje-update" + ext);
     const d = await net.fetch(asset.browser_download_url);
@@ -168,8 +252,9 @@ async function checkUpdate() {
     } else {
       spawn(f, ["/S", "--force-run"], { detached: true, stdio: "ignore" }).unref();
     }
-    quitting = true; app.quit();
-  } catch (e) { updating = false; log("update failed: " + e); }
+    setTimeout(() => { quitting = true; app.quit(); }, 1500);
+    return "Installing build " + n + "… the app will restart.";
+  } catch (e) { updating = false; log("update failed: " + e); return "Update failed: " + e.message; }
 }
 
 app.whenReady().then(() => {
@@ -180,7 +265,7 @@ app.whenReady().then(() => {
   createWindow(); createTray();
   const wake = () => win && win.webContents.send("wake");
   powerMonitor.on("resume", wake); powerMonitor.on("unlock-screen", wake);
-  setTimeout(checkUpdate, 60e3); setInterval(checkUpdate, 6 * 3600e3);
+  setTimeout(() => checkUpdate(false), 30e3); setInterval(() => checkUpdate(false), 6 * 3600e3);
 });
 app.on("activate", show);
 app.on("before-quit", () => { quitting = true; });
