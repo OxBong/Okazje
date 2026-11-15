@@ -31,7 +31,7 @@ h1, h2, h3 { margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
 .login .row button { flex: 1; justify-content: center; }
 .set { display: grid; gap: 10px; }
 .set label { font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
-.sizes { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.sizes { grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-auto-flow: row dense; }
 .sizes label.wide { grid-column: 1 / -1; }
 .set .row { display: flex; gap: 8px; flex-wrap: wrap; }
 body.mac-app .top { padding-top: 34px; -webkit-app-region: drag; }
