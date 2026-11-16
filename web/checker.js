@@ -91,12 +91,13 @@
     var rows = [], n = 0;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it.bought || !/^https:\/\//.test(it.url || "") || /olx\.pl|pepper\.pl|\/search|query=/.test(it.url) || CLOUD_BLOCKED.test(it.url)) continue;
+      if (it.bought || !/^https:\/\//.test(it.url || "") || /olx\.pl|pepper\.pl|\/search|query=/.test(it.url) || (CLOUD_BLOCKED.test(it.url) && !B.fetchRendered)) continue;
       var prev = oldStatus[it.id] || {}, fails = prev.fails || 0;
       if (fails >= 3 && prev.checked && Date.now() - new Date(prev.checked) < 6 * 3600e3) continue;
       var e = { name: it.name, url: it.url, target: it.target, price: null, lastPrice: prev.price || prev.lastPrice || null, ok: false, checked: nowIso() };
       try {
-        var r = await B.fetchText(it.url);
+        var r = CLOUD_BLOCKED.test(it.url) ? await B.fetchRendered(it.url) : await B.fetchText(it.url);
+        if ((r.status >= 400 || !getPrice(r.text)) && B.fetchRendered && !CLOUD_BLOCKED.test(it.url)) r = await B.fetchRendered(it.url);   // blocked or price drawn by JS: try the hidden browser
         var price = r.status < 400 ? getPrice(r.text) : null;
         var img = (r.text.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || null;
         if (price) {

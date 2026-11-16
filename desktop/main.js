@@ -90,6 +90,33 @@ ipcMain.handle("fetchText", async (_e, url, opts = {}) => {
     return { status: r.status, text: await r.text() };
   } finally { clearTimeout(t); }
 });
+// Hidden real browser window for shops that block plain requests (Zalando, Media Expert, Allegro).
+// Never shown; loads the page like Chrome would, waits for it to settle, returns the HTML.
+let shopQueue = Promise.resolve();
+function fetchRendered(url) {
+  const job = shopQueue.then(() => new Promise((resolve) => {
+    const w = new BrowserWindow({ show: false, width: 1280, height: 900, webPreferences: { partition: "persist:shops", backgroundThrottling: false, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+    w.webContents.setAudioMuted(true);
+    w.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    let done = false;
+    const finish = async (status) => {
+      if (done) return; done = true;
+      let text = "";
+      try { text = await w.webContents.executeJavaScript("document.documentElement.outerHTML", true); } catch {}
+      try { w.destroy(); } catch {}
+      resolve({ status, text });
+    };
+    let status = 200;
+    w.webContents.on("did-navigate", (_e, _u, code) => { if (code) status = code; });
+    w.webContents.on("did-finish-load", () => setTimeout(() => finish(status), 5000));
+    w.webContents.on("did-fail-load", (_e, code, _d, _u, isMain) => { if (isMain && code !== -3) finish(0); });
+    setTimeout(() => finish(status), 45000);
+    w.loadURL(url, { userAgent: UA, extraHeaders: "Accept-Language: pl-PL,pl;q=0.9\n" }).catch(() => {});
+  }));
+  shopQueue = job.catch(() => {});
+  return job;
+}
+ipcMain.handle("fetchRendered", (_e, url) => fetchRendered(url));
 ipcMain.handle("fetchBytes", async (_e, url) => {
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 30000);
   try { const r = await net.fetch(url, { headers: { "User-Agent": UA }, signal: ctrl.signal }); if (!r.ok) return null; return new Uint8Array(await r.arrayBuffer()); }

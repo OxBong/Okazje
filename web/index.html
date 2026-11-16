@@ -431,8 +431,8 @@ a.btn { text-decoration: none; display: inline-block; }
   // Same rule as checker.js: these links can't be price-checked automatically
   function manualReason(url) {
     if (!/^https:\/\//.test(url || "")) return "";
-    var m = String(url).match(/(zalando|mediaexpert|allegro|pepper|olx)\./);
-    if (m) return { zalando: "Zalando", mediaexpert: "Media Expert", allegro: "Allegro", pepper: "Pepper", olx: "OLX" }[m[1]] + " blocks automatic price checks";
+    var m = String(url).match(/(pepper|olx)\./);
+    if (m) return { pepper: "Pepper", olx: "OLX" }[m[1]] + " links can't be price-checked";
     if (/\/search|query=/.test(url)) return "Search pages can't be price-checked";
     return "";
   }
