@@ -177,6 +177,8 @@ a.btn { text-decoration: none; display: inline-block; }
 .msg.hint { background: none; color: var(--muted); font-size: 13px; padding: 0; }
 .cin { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: end; }
 .cin textarea { min-height: 44px; }
+.hit.new { box-shadow: 0 0 0 2px var(--accent); }
+.hit.new .b::before { content: "NEW"; font-size: 11px; font-weight: 800; color: var(--accent); letter-spacing: .06em; }
 .hit .b { padding: 12px 14px; display: grid; gap: 6px; }
 .hit a { font-weight: 600; font-size: 14px; text-decoration: none; line-height: 1.3; }
 .hit .pr { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
@@ -362,6 +364,14 @@ a.btn { text-decoration: none; display: inline-block; }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function num(v) { if (v === "" || v == null) return null; var n = typeof v === "number" ? v : parseFloat(v); return isFinite(n) ? n : null; }
   function zl(v) { var n = num(v); return n == null ? "–" : n.toLocaleString("pl-PL", { maximumFractionDigits: n % 1 ? 2 : 0 }) + " zł"; }
+  // "today 11:02 · 4 h ago" / "yesterday 22:10 · 13 h ago" / "14 Nov 09:00 · 2 days ago"
+  function when(iso) {
+    if (!iso) return ""; var d = new Date(iso); if (isNaN(d)) return "";
+    var t = d.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var day = d >= today ? "today" : d >= new Date(today - 864e5) ? "yesterday" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return day + " " + t + " · " + ago(iso);
+  }
   function ago(iso) {
     if (!iso) return ""; var d = new Date(iso); if (isNaN(d)) return "";
     var m = Math.round((Date.now() - d) / 60000);
@@ -503,7 +513,7 @@ a.btn { text-decoration: none; display: inline-block; }
     shopLinks(it).forEach(function (x) { var a = el("a", null, x[0]); a.href = x[1]; a.target = "_blank"; a.rel = "noopener"; shops.append(a); });
     foot.append(shops);
     var acts = el("div", "acts");
-    if (s.checked) acts.append(el("span", "when", ago(s.checked)));
+    if (s.checked) acts.append(el("span", "when", "Checked " + when(s.checked)));
     var b1 = el("button", "btn small", it.bought ? "Watch again" : "Bought"); b1.type = "button";
     b1.onclick = function () { it.bought = !it.bought; save(it, it.bought ? "Marked as bought" : "Back on the list"); };
     var b2 = el("button", "btn small", "Edit"); b2.type = "button"; b2.onclick = function () { startEdit(it); };
@@ -536,6 +546,7 @@ a.btn { text-decoration: none; display: inline-block; }
     if (need.length) { DB.photoUrls(need).then(function (m) { var got = Object.keys(m).length; Object.assign(photoUrls, m); if (got) renderHits(); }); }
     hs.forEach(function (h) {
       var c = el("div", "hit"), list = hitPhotos(h);
+      if (h.time && Date.now() - new Date(h.time) < 864e5) c.classList.add("new");
       if (list.length) {
         var wrap = el("div", "gal-wrap"), g = el("div", "gal");
         list.forEach(function (u, i) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = u; im.onerror = function () { im.remove(); }; im.onclick = function () { lightbox(list, i); }; g.append(im); });
@@ -544,7 +555,7 @@ a.btn { text-decoration: none; display: inline-block; }
       }
       var b = el("div", "b");
       var a = el("a", null, h.name); if (/^https:\/\//.test(h.url || "")) { a.href = h.url; a.target = "_blank"; a.rel = "noopener"; }
-      b.append(a, el("div", "pr", zl(h.price)), el("div", "m", [h.city, ago(h.time), h.storedUntil ? "photos kept until " + new Date(h.storedUntil).toLocaleDateString("pl-PL") : ""].filter(Boolean).join(" · ")));
+      b.append(a, el("div", "pr", zl(h.price)), el("div", "m", [h.city, "found " + when(h.time), h.storedUntil ? "photos kept until " + new Date(h.storedUntil).toLocaleDateString("pl-PL") : ""].filter(Boolean).join(" · ")));
       if (h.verdict) b.append(el("div", "v", h.verdict));
       if (h.analysis) {
         var det = el("details", "an"), sm = el("summary", null, "Claude's full analysis");
@@ -558,7 +569,7 @@ a.btn { text-decoration: none; display: inline-block; }
     var box = $("searches"); box.textContent = "";
     (D.searches || []).forEach(function (s) {
       var st = D.status["search-" + s.id] || {}, r = el("div", "srch");
-      r.append(el("b", null, s.name), el("span", null, zl(s.min) + " – " + zl(s.max) + (st.checked ? " · checked " + ago(st.checked) : "")));
+      r.append(el("b", null, s.name), el("span", null, zl(s.min) + " – " + zl(s.max) + (st.checked ? " · checked " + when(st.checked) : "")));
       var a = el("a", null, "Open on OLX →");
       a.href = "https://www.olx.pl/oferty/q-" + encodeURIComponent(String(s.query).replace(/ /g, "-")) + "/?search%5Border%5D=created_at:desc&search%5Bfilter_float_price:from%5D=" + s.min + "&search%5Bfilter_float_price:to%5D=" + s.max;
       a.target = "_blank"; a.rel = "noopener"; r.append(a); box.append(r);
