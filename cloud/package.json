@@ -1,0 +1,1 @@
+{ "name": "okazje-cloud", "private": true, "type": "module", "dependencies": { "@supabase/supabase-js": "2.80.0" } }

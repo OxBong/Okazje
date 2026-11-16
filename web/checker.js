@@ -160,7 +160,13 @@
       if (!(await window.DB.session())) return "not logged in";
       var dev = await B.device();
       var mine = await sb.rpc("claim_runner", { dev: force ? dev : dev }).then(must);
-      if (!mine && !force) return "another computer is checking";
+      if (!mine && !force) {
+        if (B.cloud) return "a computer is checking";
+        // A computer always takes over from the cloud backup right away
+        var rr = await sb.from("runner").select("device").maybeSingle();
+        if (!(rr.data && /^Cloud/.test(rr.data.device))) return "another computer is checking";
+        await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
+      }
       if (!mine && force) await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
       var d = await window.DB.loadAll();
       var topic = await window.DB.getSetting("ntfy");

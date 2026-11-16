@@ -1,0 +1,22 @@
+# Cloud backup checker: when both the Mac and the PC are off, this checks OLX searches and shop links (no Claude).
+name: Cloud backup check
+on:
+  schedule:
+    - cron: "7,27,47 * * * *"
+  workflow_dispatch:
+concurrency: { group: cloud-check, cancel-in-progress: false }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+        working-directory: cloud
+      - run: node runner.mjs
+        working-directory: cloud
+        env:
+          OKAZJE_EMAIL: ${{ secrets.OKAZJE_EMAIL }}
+          OKAZJE_PASSWORD: ${{ secrets.OKAZJE_PASSWORD }}

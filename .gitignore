@@ -3,3 +3,4 @@ desktop/dist/
 desktop/web/
 .DS_Store
 *.log
+cloud/node_modules

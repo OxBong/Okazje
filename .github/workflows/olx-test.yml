@@ -1,9 +1,0 @@
-name: OLX reachability test
-on: workflow_dispatch
-jobs:
-  t:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          curl -s -o /dev/null -w "olx api: %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36" "https://www.olx.pl/api/v1/offers/?offset=0&limit=5&query=apple+watch"
-          curl -s -o /dev/null -w "ntfy: %{http_code}\n" https://ntfy.sh/
