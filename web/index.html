@@ -415,11 +415,20 @@ a.btn { text-decoration: none; display: inline-block; }
   }
 
   function info(it) { return D.status[it.id] || {}; }
+  // Same rule as checker.js: these links can't be price-checked automatically
+  function manualReason(url) {
+    if (!/^https:\/\//.test(url || "")) return "";
+    var m = String(url).match(/(zalando|mediaexpert|allegro|pepper|olx)\./);
+    if (m) return { zalando: "Zalando", mediaexpert: "Media Expert", allegro: "Allegro", pepper: "Pepper", olx: "OLX" }[m[1]] + " blocks automatic price checks";
+    if (/\/search|query=/.test(url)) return "Search pages can't be price-checked";
+    return "";
+  }
   function status(it) {
     if (it.bought) return { k: "done", t: "Bought", rank: 9 };
     var s = info(it), p = num(s.price), t = num(it.target);
     if (!/^https:\/\//.test(it.url || "")) return { k: "unchecked", t: "OLX search", rank: 3 };
-    if (p == null) return { k: "unchecked", t: s.checked ? "Price not found" : "Not checked", rank: 3 };
+    if (p == null && manualReason(it.url)) return { k: "unchecked", t: "Check manually", rank: 3 };
+    if (p == null) return { k: "unchecked", t: s.checked ? "Price not found" : "Not checked yet", rank: 3 };
     if (t == null) return { k: "wait", t: "No target", rank: 4 };
     if (p <= t) return { k: "buy", t: "Buy now", rank: 0 };
     if (p <= t * 1.1) return { k: "close", t: "Almost", rank: 1 };
@@ -465,11 +474,12 @@ a.btn { text-decoration: none; display: inline-block; }
     var p = num(s.price), t = num(it.target), was = num(s.lastPrice);
     var hasUrl = /^https:\/\//.test(it.url || "");
     var price = el("div", "price"), pl = el("div"), big = el("div");
-    big.append(el("span", "big" + (p == null ? " sm" : ""), p != null ? zl(p) : hasUrl ? (s.checked ? "No price yet" : "Checking…") : "Watching OLX"));
+    var why = manualReason(it.url);
+    big.append(el("span", "big" + (p == null ? " sm" : ""), p != null ? zl(p) : hasUrl ? (why ? "Check manually" : s.checked ? "No price yet" : "Waiting for next check") : "Watching OLX"));
     if (p != null && was != null && was > p) big.append(el("span", "was", zl(was)));
     pl.append(big);
     var shop = el("div", "shop");
-    if (hasUrl) { var a = el("a", null, host(it.url) || "Open offer"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; shop.append(a); }
+    if (hasUrl) { var a = el("a", null, host(it.url) || "Open offer"); a.href = it.url; a.target = "_blank"; a.rel = "noopener"; shop.append(a); if (why && p == null) shop.append(el("span", "checked", " · " + why + ", tap to see the price")); }
     else shop.textContent = "New listings show up under Latest hits";
     pl.append(shop);
     var side = el("div", "side");
