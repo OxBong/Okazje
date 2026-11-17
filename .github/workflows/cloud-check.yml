@@ -8,6 +8,7 @@ concurrency: { group: cloud-check, cancel-in-progress: false }
 jobs:
   check:
     runs-on: ubuntu-latest
+    environment: cloud
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
