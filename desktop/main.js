@@ -108,15 +108,47 @@ function fetchRendered(url) {
     };
     let status = 200;
     w.webContents.on("did-navigate", (_e, _u, code) => { if (code) status = code; });
-    w.webContents.on("did-finish-load", () => setTimeout(() => finish(status), 5000));
+    // Shops often show a short "checking your browser" page first, then reload the real page.
+    // Poll until the real product page is there (price data present) or give up after ~35 s.
+    let polling = false;
+    w.webContents.on("did-finish-load", () => {
+      if (polling) return; polling = true;
+      const started = Date.now();
+      const poll = async () => {
+        if (done) return;
+        let ready = false;
+        try {
+          ready = await w.webContents.executeJavaScript(`(() => {
+            const t = document.title || "", h = document.documentElement.innerHTML;
+            if (/Cierpliwo|Just a moment|Attention Required|Access Denied|captcha/i.test(t)) return false;
+            return /application\\/ld\\+json|product:price:amount|itemprop="price"/.test(h);
+          })()`, true);
+        } catch {}
+        if (ready) return setTimeout(() => finish(status === 403 ? 200 : status), 1500);
+        if (Date.now() - started > 35000) return finish(status);
+        setTimeout(poll, 2500);
+      };
+      setTimeout(poll, 3000);
+    });
     w.webContents.on("did-fail-load", (_e, code, _d, _u, isMain) => { if (isMain && code !== -3) finish(0); });
-    setTimeout(() => finish(status), 45000);
+    setTimeout(() => finish(status), 60000);
     w.loadURL(url, { userAgent: UA, extraHeaders: "Accept-Language: pl-PL,pl;q=0.9\n" }).catch(() => {});
   }));
   shopQueue = job.catch(() => {});
   return job;
 }
 ipcMain.handle("fetchRendered", (_e, url) => fetchRendered(url));
+// "Open shop": a normal visible window with the same cookies as the hidden checker. If a shop shows
+// a "verify you're human" page or a cookie banner, the user clicks through it once; the hidden checks
+// then reuse those cookies.
+ipcMain.handle("openShop", (_e, url) => new Promise((resolve) => {
+  if (!/^https:\/\//.test(url || "")) return resolve(false);
+  const w = new BrowserWindow({ width: 1200, height: 860, title: "Okazje: open the shop, accept cookies or the check, then close this window",
+    webPreferences: { partition: "persist:shops", contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  w.webContents.setWindowOpenHandler(({ url: u }) => { w.loadURL(u); return { action: "deny" }; });
+  w.on("closed", () => resolve(true));
+  w.loadURL(url, { userAgent: UA }).catch(() => {});
+}));
 ipcMain.handle("fetchBytes", async (_e, url) => {
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 30000);
   try { const r = await net.fetch(url, { headers: { "User-Agent": UA }, signal: ctrl.signal }); if (!r.ok) return null; return new Uint8Array(await r.arrayBuffer()); }

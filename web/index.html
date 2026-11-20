@@ -559,7 +559,17 @@ a.btn { text-decoration: none; display: inline-block; }
     if (it.max) side.append(el("span", null, "max " + zl(it.max)));
     price.append(pl, side); c.append(price);
     if (s.error && !it.bought) {
-      c.append(el("div", "warn", "⚠ " + s.error + (s.staleSince ? ". Showing the last price from " + when(s.staleSince) + "." : ".")));
+      var wn = el("div", "warn", "⚠ " + s.error + (s.staleSince ? ". Showing the last price from " + when(s.staleSince) + "." : "."));
+      if (window.okazje && window.okazje.openShop && /^https:\/\//.test(it.url || "")) {
+        var ub = el("button", "btn small", "Open shop to unblock");
+        ub.type = "button"; ub.title = "Opens the shop in a window. Accept cookies or the 'are you human' check, then close it. Hidden checks reuse that.";
+        ub.onclick = function () {
+          toast("Accept cookies or the check in the shop window, then close it");
+          window.okazje.openShop(it.url).then(function () { toast("Checking again…"); return window.Checker && window.Checker.runOnce(true); }).then(function () { load(); });
+        };
+        wn.append(" ", ub);
+      }
+      c.append(wn);
     }
     if (s.best && s.best.price && !it.bought) {
       var bb = el("div", "best"), bl = el("a", null, zl(s.best.price) + " at " + (s.best.shop || host(s.best.url)));
