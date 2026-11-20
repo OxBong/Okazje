@@ -6,6 +6,8 @@
 set -euo pipefail
 SLEEP_AT="${1:-22:00}"; WAKE_AT="${2:-07:00}"
 [ "$(id -u)" = 0 ] || { echo "Run with sudo"; exit 1; }
+# Use Polish time, so 22:00 means 22:00 in Gdynia
+[ "$(timedatectl show -p Timezone --value 2>/dev/null)" = "Europe/Warsaw" ] || timedatectl set-timezone Europe/Warsaw
 
 cat > /usr/local/bin/okazje-sleep <<SH
 #!/bin/bash
