@@ -19,6 +19,7 @@ fs.mkdirSync(data, { recursive: true });
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36";
 const { OKAZJE_EMAIL, OKAZJE_PASSWORD } = process.env;
 if (!OKAZJE_EMAIL || !OKAZJE_PASSWORD) { console.log("OKAZJE_EMAIL / OKAZJE_PASSWORD missing (see ~/.okazje/env)"); process.exit(1); }
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => { (ctxP ? ctxP.then((c) => c.close()).catch(() => {}) : Promise.resolve()).finally(() => process.exit(0)); setTimeout(() => process.exit(0), 5000); });
 const log = (m) => console.log(new Date().toISOString().slice(0, 19), m);
 
 // ---- hidden browser (one shared Chromium profile so cookies persist) ----
