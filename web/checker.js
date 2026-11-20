@@ -121,10 +121,10 @@
     var rows = [], n = 0;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      if (it.bought || !/^https:\/\//.test(it.url || "") || /olx\.pl|pepper\.pl|\/search|query=/.test(it.url) || (CLOUD_BLOCKED.test(it.url) && !B.fetchRendered)) continue;
+      if (it.bought || !/^https:\/\//.test(it.url || "") || /olx\.pl|pepper\.pl|\/search|query=/.test(it.url) || (CLOUD_BLOCKED.test(it.url) && !B.fetchRendered) || (B.primary && CLOUD_BLOCKED.test(it.url))) continue;
       var prev = oldStatus[it.id] || {}, fails = prev.fails || 0;
       if (fails >= 3 && prev.checked && Date.now() - new Date(prev.checked) < 6 * 3600e3) continue;
-      var e = { name: it.name, url: it.url, target: it.target, price: null, lastPrice: prev.price || prev.lastPrice || null, ok: false, checked: nowIso() };
+      var e = { name: it.name, url: it.url, target: it.target, price: null, lastPrice: prev.price || prev.lastPrice || null, ok: false, checked: nowIso(), by: curDev };
       if (prev.best) e.best = prev.best;
       try {
         var r = CLOUD_BLOCKED.test(it.url) ? await B.fetchRendered(it.url) : await B.fetchText(it.url);
@@ -144,6 +144,8 @@
         }
       } catch (ex) { fails++; e.error = "Couldn't open the page"; if (prev.price) { e.price = prev.price; e.staleSince = prev.staleSince || prev.checked; } if (fails <= 3) B.log("failed (" + ex + "): " + it.name); }
       e.fails = e.ok ? 0 : fails;
+      // A computer read this shop fine recently: don't overwrite its price with our "blocked"
+      if (!e.ok && prev.ok && prev.by && prev.by !== curDev && Date.now() - new Date(prev.checked) < 3 * 3600e3) { await sleep(2000); continue; }
       rows.push({ user_id: window.DB.uid, id: it.id, data: e });
       await sleep(3000 + Math.random() * 6000);
     }
@@ -223,12 +225,13 @@
     return n;
   }
 
+  var curDev = null;
   async function runOnce(force) {
     if (running) return "busy";
     running = true;
     try {
       if (!(await window.DB.session())) return "not logged in";
-      var dev = await B.device();
+      var dev = await B.device(); curDev = dev;
       var mine = await sb.rpc("claim_runner", { dev: force ? dev : dev }).then(must);
       if (!mine && !force) {
         if (B.cloud) return "a computer is checking";
@@ -237,7 +240,19 @@
         else {
         // A computer always takes over from the cloud backup right away
         var rr = await sb.from("runner").select("device").maybeSingle();
-        if (!(rr.data && /^Cloud/.test(rr.data.device))) return "another computer is checking";
+        if (!(rr.data && /^Cloud/.test(rr.data.device))) {
+          // The home server checks everything else; this computer only checks the shops that block the server
+          if (rr.data && /^Home server/.test(rr.data.device) && B.fetchRendered) {
+            var d0 = await window.DB.loadAll(), topic0 = await window.DB.getSetting("ntfy");
+            var left = d0.wishlist.filter(function (it) {
+              var st = d0.status[it.id] || {};
+              return CLOUD_BLOCKED.test(it.url || "") || (!st.ok && /^Home server/.test(st.by || "") && /blocked|Shop error|not found|open the page/.test(st.error || ""));
+            });
+            var m0 = left.length ? await checkItems(topic0, left, d0.status) : 0;
+            return "the home server is checking" + (left.length ? "; " + left.length + " blocked shop page(s) checked here, " + m0 + " new hit(s)" : "");
+          }
+          return "another computer is checking";
+        }
         await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
         }
       }
