@@ -124,12 +124,17 @@ async function verdict(hit, criteria) {
 async function priceSearch(items, ctx) {
   if (!findClaude() || !items || !items.length) return null;
   const list = items.map((i, n) => `${n + 1}. id=${i.id} | ${i.name}${i.size ? " | size " + i.size : ""}${i.target ? " | target " + i.target + " zl" : ""}${i.used === "yes" ? " | used OK" : " | new only"}${i.url ? " | tracked link: " + i.url : ""}${i.notes ? " | notes: " + String(i.notes).slice(0, 200) : ""}`).join("\n");
-  const prompt = `Find the cheapest CURRENT price for each product below, for a buyer in Gdynia, Poland. Search the web: Polish shops (Zalando, x-kom, Media Expert, RTV Euro AGD, Morele, Allegro (only "Allegro Smart"/business sellers), Notino, Rossmann, Sportano, 50style, Answear, Decathlon, IKEA, Pepper.pl deals, Ceneo) and EU shops that ship to PL. Same exact product (model, colour, size if given). Include valid public promo codes only if shown on the shop page. Skip out-of-stock, marketplace scams and fake discounts. Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}.
+  const prompt = `Find the cheapest CURRENT price for each product below, for a buyer in Gdynia, Poland. Search the web as widely as you can (more shops = more chances). Check at least 8-10 shops per product, picking the ones that fit its category:
+- Clothes & streetwear: Zalando, Zalando Lounge, About You, Answear, Modivo, 50style, Distance, Footshop, Worldbox, Sizeer, Sportano, Snipes, JD Sports, TK Maxx online, Limango, Bonprix, Vinted (clothes only, never shoes), brand shops (H&M, Zara, Pull&Bear, Bershka, Reserved, Cropp, House, Medicine, 4F, Carhartt WIP, Nike, Adidas, Puma, New Balance, New Era), Decathlon.
+- Shoes: Zalando, eobuwie, Modivo, 50style, Footshop, Sizeer, Distance, Worldbox, Snipes, JD Sports, Sportano, Answear, About You, CCC, Deichmann, brand shops (Nike, Adidas, Puma, New Balance, Converse, Vans); EU: Zalando.de, Footlocker EU, END., Size? (only if they ship to PL with no big customs/fees).
+- Electronics: x-kom, Media Expert, RTV Euro AGD, MediaMarkt, Morele, Komputronik, Neonet, Allegro (only "Allegro Smart"/business sellers), Amazon.pl, Amazon.de (ships to PL), iSpot, Cortland, Apple refurbished, Samsung PL, Proline, Avans, OleOle, Electro.pl, Mi-Home, Lenovo/eLenovo, Dell, HP shops; outlets and "powystawowe"/refurb sections of these shops.
+- Home & other: IKEA, Allegro (business sellers), Amazon.pl, Empik, Notino, Rossmann, Hebe, Douglas, Ceneo.
+- Always also check the deal and comparison sites: Pepper.pl (current deals and codes), Ceneo, Skapiec, idealo.de/Geizhals (for EU shops shipping to PL), and the shops' outlet/sale pages. Same exact product (model, colour, size if given). Include valid public promo codes only if shown on the shop page. Skip out-of-stock, marketplace scams and fake discounts. Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}.
 ${list}
 
 Reply with ONLY a JSON array, one object per product, no other text:
 [{"id":"<id>","price":<number in zl or null>,"shop":"<shop name>","url":"<direct https product link>","note":"<max 120 chars: e.g. -20% until Sunday, size 44 in stock>"}]`;
-  const out = await runClaude(["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "40"], prompt, 900000);
+  const out = await runClaude(["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "60"], prompt, 1500000);
   const m = String(out || "").match(/\[[\s\S]*\]/);
   try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
 }
