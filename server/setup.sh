@@ -14,11 +14,12 @@ say "2/6 Installing Node 22 and git"
 for f in /etc/apt/sources.list.d/*ondrej*; do [ -e "$f" ] && case "$f" in *.disabled) ;; *) sudo mv "$f" "$f.disabled";; esac; done
 sudo apt-get update --allow-releaseinfo-change -qq >/dev/null || sudo apt-get update -qq
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/dev/null
+  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/dev/null 2>&1 || true
+  sudo apt-get update --allow-releaseinfo-change -qq >/dev/null 2>&1 || true
   sudo apt-get install -y nodejs >/dev/null
 fi
 sudo apt-get install -y git ca-certificates >/dev/null
-node -v
+node -v; command -v npm >/dev/null || { echo "npm missing: Node install failed"; exit 1; }
 
 say "3/6 Getting the checker"
 if [ -d "$REPO/.git" ]; then git -C "$REPO" pull --ff-only -q; else git clone -q https://github.com/OxBong/Okazje.git "$REPO"; fi
