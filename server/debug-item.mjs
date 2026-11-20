@@ -12,7 +12,7 @@ const { data } = await sb.from("items").select("id,data");
 const it = data.map((x) => x.data).find((d) => (d.name || "").toLowerCase().includes(q));
 if (!it) { console.log("No item matches", q); process.exit(1); }
 console.log("ITEM:", it.name, "\nURL:", it.url);
-const ctx = await chromium.launchPersistentContext(path.join(os.homedir(), ".okazje/chromium"), { headless: true, locale: "pl-PL", viewport: { width: 1280, height: 900 } });
+const ctx = await chromium.launchPersistentContext(path.join(os.homedir(), ".okazje/chromium-debug"), { headless: true, locale: "pl-PL", viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
 const r = await page.goto(it.url, { waitUntil: "domcontentloaded", timeout: 45000 }).catch((e) => (console.log("goto:", e.message), null));
 console.log("STATUS:", r && r.status());
