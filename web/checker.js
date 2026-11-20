@@ -11,14 +11,44 @@
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function nowIso() { return new Date().toISOString(); }
 
+  // Price on a product page. Structured data (JSON-LD) first: it holds the real current/sale price,
+  // while "product:price:amount" meta tags often still show the old regular price.
+  function ldPrice(html) {
+    var re = /<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi, m;
+    while ((m = re.exec(html))) {
+      var j; try { j = JSON.parse(m[1].trim()); } catch (e) { continue; }
+      var stack = [].concat(j), seen = 0;
+      while (stack.length && seen++ < 200) {
+        var x = stack.shift(); if (!x || typeof x !== "object") continue;
+        if (Array.isArray(x)) { stack = stack.concat(x); continue; }
+        if (x["@graph"]) stack = stack.concat(x["@graph"]);
+        var t = [].concat(x["@type"] || []).join(" ");
+        if (/Product/.test(t) && x.offers) {
+          var vals = [].concat(x.offers).map(function (o) {
+            if (!o) return null;
+            var v = o.price != null ? o.price : o.lowPrice != null ? o.lowPrice : (o.priceSpecification && [].concat(o.priceSpecification)[0] || {}).price;
+            if (o.availability && /OutOfStock|Discontinued/i.test(o.availability)) return null;
+            v = parseFloat(String(v).replace(",", ".")); return v >= 5 ? v : null;
+          }).filter(function (v) { return v != null; });
+          if (vals.length) return Math.min.apply(null, vals);
+        }
+      }
+    }
+    return null;
+  }
   function getPrice(html) {
-    var pats = [/property="product:price:amount"\s+content="([0-9]+(?:[.,][0-9]{1,2})?)"/g,
+    var v = ldPrice(html); if (v) return v;
+    var pats = [/property="product:sale_price:amount"\s+content="([0-9]+(?:[.,][0-9]{1,2})?)"/g,
+                /property="(?:product|og):price:amount"\s+content="([0-9]+(?:[.,][0-9]{1,2})?)"/g,
                 /itemprop="price"[^>]*content="([0-9]+(?:[.,][0-9]{1,2})?)"/g,
                 /"price"\s*:\s*"?([0-9]+(?:[.,][0-9]{1,2})?)/g];
     for (var i = 0; i < pats.length; i++) {
-      var m; while ((m = pats[i].exec(html))) { var v = parseFloat(m[1].replace(",", ".")); if (v >= 5) return v; }
+      var m; while ((m = pats[i].exec(html))) { var n = parseFloat(m[1].replace(",", ".")); if (n >= 5) return n; }
     }
     return null;
+  }
+  function blocked(r) {
+    return r.status === 403 || r.status === 429 || /<title>\s*(Cierpliwości|Just a moment|Access Denied|Attention Required|Captcha)/i.test(r.text || "");
   }
   var CLOUD_BLOCKED = /mediaexpert\.pl|zalando\.|allegro\.pl/;   // these shops block scripts
 
@@ -95,6 +125,7 @@
       var prev = oldStatus[it.id] || {}, fails = prev.fails || 0;
       if (fails >= 3 && prev.checked && Date.now() - new Date(prev.checked) < 6 * 3600e3) continue;
       var e = { name: it.name, url: it.url, target: it.target, price: null, lastPrice: prev.price || prev.lastPrice || null, ok: false, checked: nowIso() };
+      if (prev.best) e.best = prev.best;
       try {
         var r = CLOUD_BLOCKED.test(it.url) ? await B.fetchRendered(it.url) : await B.fetchText(it.url);
         if ((r.status >= 400 || !getPrice(r.text)) && B.fetchRendered && !CLOUD_BLOCKED.test(it.url)) r = await B.fetchRendered(it.url);   // blocked or price drawn by JS: try the hidden browser
@@ -106,13 +137,52 @@
           if (hit && price !== e.lastPrice) {
             if (await newHit(topic, it.id + ":" + price, { name: it.name, clothes: it.category === "clothes", criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł, new from a legit Polish shop" + (it.notes ? ". Notes: " + it.notes : ""), price: price, target: it.target, was: e.lastPrice, url: it.url, image: img, desc: e.lastPrice ? "Was " + e.lastPrice + " zł" : "" })) n++;
           }
-        } else { fails++; if (fails <= 3) B.log("no price found: " + it.name); }
-      } catch (ex) { fails++; if (fails <= 3) B.log("failed (" + ex + "): " + it.name); }
+        } else {
+          fails++; e.error = blocked(r) ? "The shop blocked the check" : r.status >= 400 ? "Shop error " + r.status : "Price not found on the page";
+          if (prev.price) { e.price = prev.price; e.stale = prev.staleSince || prev.checked || true; e.staleSince = prev.staleSince || prev.checked; }
+          if (fails <= 3) B.log(e.error + ": " + it.name);
+        }
+      } catch (ex) { fails++; e.error = "Couldn't open the page"; if (prev.price) { e.price = prev.price; e.staleSince = prev.staleSince || prev.checked; } if (fails <= 3) B.log("failed (" + ex + "): " + it.name); }
       e.fails = e.ok ? 0 : fails;
       rows.push({ user_id: window.DB.uid, id: it.id, data: e });
       await sleep(3000 + Math.random() * 6000);
     }
     if (rows.length) must(await sb.from("status").upsert(rows));
+    return n;
+  }
+
+  // Claude price search (desktop only, 1-2x a day, one computer): cheapest current offer across shops for every item
+  async function claudeSearch(topic, d) {
+    if (!B.priceSearch || !B.getPref) return 0;
+    var mode = (await B.getPref("priceSearch")) || "daily";
+    if (mode === "off" || new Date().getHours() < 7) return 0;
+    var last = await window.DB.getSetting("lastPriceSearch").catch(function () { return null; });
+    if (last && Date.now() - new Date(last) < (mode === "twice" ? 11 : 22) * 3600e3) return 0;
+    var items = d.wishlist.filter(function (i) { return !i.bought && !(i.used === "yes" && !/^https:/.test(i.url || "")); });
+    if (!items.length) return 0;
+    await window.DB.setSetting("lastPriceSearch", nowIso());          // claim it so the other computer doesn't run it too
+    var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
+    B.log("Claude price search started (" + items.length + " items)");
+    var res = await B.priceSearch(items.map(function (i) { return { id: i.id, name: i.name, size: i.size, target: i.target, used: i.used, url: i.url, notes: i.notes }; }),
+      { sizes: sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "" });
+    if (!res) { B.log("Claude price search: no result"); return 0; }
+    var fresh = {}, r0 = await sb.from("status").select("id,data").in("id", items.map(function (i) { return i.id; }));
+    (r0.data || []).forEach(function (x) { fresh[x.id] = x.data; });
+    var rows = [], n = 0;
+    for (var k = 0; k < res.length; k++) {
+      var r = res[k], it = items.find(function (i) { return i.id === r.id; });
+      if (!it || !(Number(r.price) > 0) || !/^https:\/\//.test(r.url || "")) continue;
+      var prev = fresh[it.id] || {}, price = Number(r.price);
+      var best = { price: price, shop: String(r.shop || "").slice(0, 40), url: r.url, note: String(r.note || "").slice(0, 160), at: nowIso() };
+      if (it.target && price <= it.target && !(prev.best && prev.best.price === price && prev.best.url === r.url)) {
+        if (await newHit(topic, it.id + ":best:" + price + ":" + best.shop, { name: it.name, clothes: it.category === "clothes",
+          criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł" + (it.notes ? ". Notes: " + it.notes : ""),
+          price: price, target: it.target, url: r.url, desc: best.shop + (best.note ? " · " + best.note : "") })) n++;
+      }
+      rows.push({ user_id: window.DB.uid, id: it.id, data: Object.assign({}, prev, { name: it.name, best: best }) });
+    }
+    if (rows.length) must(await sb.from("status").upsert(rows));
+    B.log("Claude price search done: " + rows.length + " prices, " + n + " hit(s)");
     return n;
   }
 
@@ -173,6 +243,7 @@
       var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
       sizesText = sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "";
       var n = await checkItems(topic, d.wishlist, d.status) + await checkSearches(topic, d.searches);
+      try { n += await claudeSearch(topic, d); } catch (e) { B.log("Claude price search error: " + (e.message || e)); }
       await sb.from("runner").update({ beat: nowIso() }).eq("user_id", window.DB.uid);
       if (topic) B.fetchText("https://ntfy.sh/" + topic + "-hb", { method: "POST", body: "up" }).catch(function () {});
       if (Math.random() < 0.05) sb.rpc("cleanup");

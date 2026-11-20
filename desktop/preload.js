@@ -17,5 +17,7 @@ contextBridge.exposeInMainWorld("okazje", {
   claudeInstall: () => ipcRenderer.invoke("claudeInstall"),
   claudeLogin: () => ipcRenderer.invoke("claudeLogin"),
   chat: (messages, ctx) => ipcRenderer.invoke("chat", messages, ctx),
+  priceSearch: (items, ctx) => ipcRenderer.invoke("priceSearch", items, ctx),
+  getPref: (k) => ipcRenderer.invoke("getPref", k),
   onWake: (cb) => ipcRenderer.on("wake", () => cb())
 });

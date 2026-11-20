@@ -258,13 +258,53 @@ ipcMain.handle("chat", async (_e, messages, ctx) => {
   return { text: out };
 });
 
+// ---- Claude price search: once or twice a day, finds the cheapest current offer for each wishlist item across shops ----
+ipcMain.handle("priceSearch", async (_e, items, ctx) => {
+  const mode = prefs().claudeMode;
+  if (mode === "off" || !items || !items.length) return null;
+  const list = items.map((i, n) => `${n + 1}. id=${i.id} | ${i.name}${i.size ? " | size " + i.size : ""}${i.target ? " | target " + i.target + " zl" : ""}${i.used === "yes" ? " | used OK" : " | new only"}${i.url ? " | tracked link: " + i.url : ""}${i.notes ? " | notes: " + String(i.notes).slice(0, 200) : ""}`).join("\n");
+  const prompt = `Find the cheapest CURRENT price for each product below, for a buyer in Gdynia, Poland. Search the web: Polish shops (Zalando, x-kom, Media Expert, RTV Euro AGD, Morele, Allegro (only "Allegro Smart"/business sellers), Notino, Rossmann, Sportano, 50style, Answear, Decathlon, IKEA, Pepper.pl deals, Ceneo) and EU shops that ship to PL. Same exact product (model, colour, size if given). Include valid public promo codes only if shown on the shop page. Skip out-of-stock, marketplace scams and fake discounts. Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}.
+${list}
+
+Reply with ONLY a JSON array, one object per product, no other text:
+[{"id":"<id>","price":<number in zl or null>,"shop":"<shop name>","url":"<direct https product link>","note":"<max 120 chars: e.g. -20% until Sunday, size 44 in stock>"}]`;
+  if (mode === "api") {
+    const key = apiKey(); if (!key) return null;
+    try {
+      const r = await net.fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 2000, tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 12 }], messages: [{ role: "user", content: prompt }] }) });
+      const j = await r.json(); if (!r.ok) { log("price search API error: " + JSON.stringify(j).slice(0, 200)); return null; }
+      return parseJsonArray((j.content || []).filter((c) => c.type === "text").map((c) => c.text).join(""));
+    } catch (e) { log("price search failed: " + e.message); return null; }
+  }
+  const exe = findClaude(); if (!exe) return null;
+  const out = await new Promise((resolve) => {
+    let txt = "";
+    const p = spawn(exe, ["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "40"], { shell: exe.endsWith(".cmd"), windowsHide: true });
+    const t = setTimeout(() => { p.kill(); resolve(txt); }, 900000);
+    p.stdout.on("data", (d) => (txt += d));
+    p.on("error", () => { clearTimeout(t); resolve(""); });
+    p.on("close", () => { clearTimeout(t); resolve(txt.trim()); });
+    p.stdin.end(prompt);
+  });
+  const res = parseJsonArray(out);
+  if (!res) log("price search: no usable answer: " + String(out).slice(0, 200));
+  return res;
+});
+function parseJsonArray(t) {
+  const m = String(t || "").match(/\[[\s\S]*\]/); if (!m) return null;
+  try { const a = JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
+}
+ipcMain.handle("getPref", (_e, k) => prefs()[k]);
+
 const TEST_HIT = { name: "Test: Sony DualSense controller, white", price: 199, url: "https://example.com", desc: "New, sealed, from a Polish shop." };
 ipcMain.handle("appInfo", () => {
   const p = prefs();
   return { build: BUILD, latest: latestBuild, platform: process.platform, autoUpdate: p.autoUpdate, claudeMode: p.claudeMode,
-    hasKey: !!p.apiKey, claudePath: findClaude() };
+    hasKey: !!p.apiKey, priceSearch: p.priceSearch || "daily", claudePath: findClaude() };
 });
-ipcMain.handle("setPref", (_e, k, v) => { if (["autoUpdate", "claudeMode"].includes(k)) setPref(k, v); });
+ipcMain.handle("setPref", (_e, k, v) => { if (["autoUpdate", "claudeMode", "priceSearch"].includes(k)) setPref(k, v); });
 ipcMain.handle("setApiKey", (_e, key) => {
   key = String(key || "").trim();
   if (!key) { setPref("apiKey", null); return true; }

@@ -186,6 +186,11 @@ a.btn { text-decoration: none; display: inline-block; }
 .cin textarea { min-height: 44px; }
 .hit.new { box-shadow: 0 0 0 2px var(--accent); }
 .hit.new .b::before { content: "NEW"; font-size: 11px; font-weight: 800; color: var(--accent); letter-spacing: .06em; }
+.item .warn { font-size: 13px; color: #f5a524; margin: 6px 0 0; }
+.item .best { font-size: 14px; background: var(--soft); border-radius: 12px; padding: 9px 12px; margin-top: 8px; overflow-wrap: anywhere; }
+.item .best .lab { color: var(--muted); }
+.item .best a { font-weight: 700; color: var(--accent); }
+.item .best .note, .item .best .when { color: var(--muted); font-size: 13px; }
 .hit .b { padding: 12px 14px; display: grid; gap: 6px; }
 .hit a { font-weight: 600; font-size: 14px; text-decoration: none; line-height: 1.3; }
 .hit .pr { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
@@ -259,7 +264,13 @@ a.btn { text-decoration: none; display: inline-block; }
           <div class="row"><button class="btn small" type="button" id="aKeySave">Save key</button>
           <a class="btn small" href="https://console.anthropic.com/settings/keys" target="_blank">Get a key</a></div>
         </div>
-        <div class="row"><button class="btn small" type="button" id="aTest">Test Claude</button></div>
+        <label>Claude price search (finds the cheapest shop for each item, like the old daily check)
+          <select id="aSearch">
+            <option value="daily">Once a day</option>
+            <option value="twice">Twice a day</option>
+            <option value="off">Off</option>
+          </select></label>
+        <div class="row"><button class="btn small" type="button" id="aTest">Test Claude</button><button class="btn small" type="button" id="aSearchNow">Search prices now</button></div>
         <span class="checked" id="aMsg"></span>
       </div>
     </section>
@@ -460,10 +471,11 @@ a.btn { text-decoration: none; display: inline-block; }
     if (/\/search|query=/.test(url)) return "Search pages can't be price-checked";
     return "";
   }
+  function bestP(s) { var a = num(s.price), b = s.best ? num(s.best.price) : null; return a == null ? b : b == null ? a : Math.min(a, b); }
   function status(it) {
     if (it.bought) return { k: "done", t: "Bought", rank: 9 };
-    var s = info(it), p = num(s.price), t = num(it.target);
-    if (!/^https:\/\//.test(it.url || "")) return { k: "unchecked", t: "OLX search", rank: 3 };
+    var s = info(it), p = bestP(s), t = num(it.target);
+    if (!/^https:\/\//.test(it.url || "") && p == null) return { k: "unchecked", t: "OLX search", rank: 3 };
     if (p == null && manualReason(it.url)) return { k: "unchecked", t: "Check manually", rank: 3 };
     if (p == null) return { k: "unchecked", t: s.checked ? "Price not found" : "Not checked yet", rank: 3 };
     if (t == null) return { k: "wait", t: "No target", rank: 4 };
@@ -546,6 +558,17 @@ a.btn { text-decoration: none; display: inline-block; }
     var tl = el("span", null, "Target "); tl.append(el("b", null, zl(t))); side.append(tl);
     if (it.max) side.append(el("span", null, "max " + zl(it.max)));
     price.append(pl, side); c.append(price);
+    if (s.error && !it.bought) {
+      c.append(el("div", "warn", "⚠ " + s.error + (s.staleSince ? ". Showing the last price from " + when(s.staleSince) + "." : ".")));
+    }
+    if (s.best && s.best.price && !it.bought) {
+      var bb = el("div", "best"), bl = el("a", null, zl(s.best.price) + " at " + (s.best.shop || host(s.best.url)));
+      bl.href = s.best.url; bl.target = "_blank"; bl.rel = "noopener";
+      bb.append(el("span", "lab", "Cheapest Claude found: "), bl);
+      if (s.best.note) bb.append(el("span", "note", " · " + s.best.note));
+      bb.append(el("span", "when", " · " + when(s.best.at)));
+      c.append(bb);
+    }
 
     if (p != null && t != null && !it.bought) {
       var g = el("div", "gauge"), tr = el("div", "track"), fl = el("div", "fill " + st.k);
@@ -729,13 +752,20 @@ a.btn { text-decoration: none; display: inline-block; }
     function refresh() {
       B.appInfo().then(function (i) {
         msg("aVer", "Version: build " + (i.build || "dev") + (i.latest && i.latest > i.build ? " · build " + i.latest + " available" : ""));
-        $("aAuto").checked = i.autoUpdate; $("aMode").value = i.claudeMode;
+        $("aAuto").checked = i.autoUpdate; $("aMode").value = i.claudeMode; $("aSearch").value = i.priceSearch || "daily";
         $("aCli").hidden = i.claudeMode !== "cli"; $("aApi").hidden = i.claudeMode !== "api"; $("aTest").parentNode.hidden = i.claudeMode === "off";
         msg("aCliMsg", i.claudePath ? "Claude Code is installed. If Test says you're not logged in, click Log in." : "Claude Code isn't installed on this computer yet.");
         $("aInstall").hidden = !!i.claudePath;
         $("aKey").placeholder = i.hasKey ? "Key saved ✓ (type a new one to replace)" : "sk-ant-…";
       });
     }
+    $("aSearchNow").onclick = function () {
+      if (!window.Checker) return;
+      msg("aMsg", "Searching all shops… this takes a few minutes. Results appear on each item.");
+      DB.setSetting("lastPriceSearch", null).then(function () { return window.Checker.runOnce(true); })
+        .then(function (r) { msg("aMsg", "Done: " + r); load(); }).catch(function (e) { msg("aMsg", e.message || String(e)); });
+    };
+    $("aSearch").onchange = function () { B.setPref("priceSearch", $("aSearch").value); };
     $("aAuto").onchange = function () { B.setPref("autoUpdate", $("aAuto").checked); };
     $("aMode").onchange = function () { B.setPref("claudeMode", $("aMode").value).then(refresh); msg("aMsg", ""); };
     $("aUpd").onclick = function () { busy("aUpd", B.checkUpdate(), "aUpdMsg"); };
