@@ -9,5 +9,5 @@ jobs:
         with: { node-version: 22 }
       - run: npm i playwright@1.49.1 && npx playwright install --with-deps chromium
         working-directory: cloud/test
-      - run: node probe.mjs "https://www.doz.pl/p/cerave-nawilzajaca-emulsja-dla-skory-normalnej-i-suchej-refill-473-ml-189984" "https://www.x-kom.pl/p/592848-pad-sony-playstation-5-dualsense-white.html" "https://www.zalando.pl/puma-speedcat-og-sneakersy-niskie-inky-depths-black-pu115o0wm-q14.html" "https://www.x-kom.pl/p/1482520-monitor-led-27-265-284-aoc-q27g41zdf.html" "https://sportano.pl/p/998876/bokserki-meskie-nike-long-boxer-brief-black" "https://www.ceneo.pl/;szukaj-pad+dualsense+bialy"
+      - run: node probe.mjs "https://www.ceneo.pl/;szukaj-pad+dualsense+bialy" "https://www.ceneo.pl/;szukaj-puma+speedcat+og"
         working-directory: cloud/test
