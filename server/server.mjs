@@ -57,6 +57,16 @@ function fetchRendered(url) {
   return job;
 }
 
+function browserGet(url) {
+  const job = queue.then(async () => {
+    const page = await (await browser()).newPage();
+    try { const r = await page.goto(url, { timeout: 30000 }); return { status: r ? r.status() : 0, text: r ? await r.text() : "" }; }
+    finally { await page.close().catch(() => {}); }
+  });
+  queue = job.catch(() => {});
+  return job;
+}
+
 // ---- optional Claude (Claude Code CLI logged in on this PC) ----
 function findClaude() {
   const c = [path.join(os.homedir(), ".local", "bin", "claude"), path.join(os.homedir(), ".claude", "local", "claude"), "/usr/local/bin/claude", "/usr/bin/claude"];
@@ -142,7 +152,10 @@ const window = {
       try {
         const r = await fetch(url, { method: opts.method || "GET", body: opts.body, signal: ctrl.signal,
           headers: Object.assign({ "User-Agent": UA, "Accept-Language": "pl-PL,pl;q=0.9" }, opts.headers || {}) });
-        return { status: r.status, text: await r.text() };
+        const res = { status: r.status, text: await r.text() };
+        // Some sites (e.g. OLX's API) refuse plain Node requests: load the same URL in the real browser instead
+        if (res.status === 403 && (!opts.method || opts.method === "GET")) return await browserGet(url).catch(() => res);
+        return res;
       } finally { clearTimeout(t); }
     },
     fetchBytes: async (url) => { const r = await fetch(url, { headers: { "User-Agent": UA } }); return r.ok ? new Uint8Array(await r.arrayBuffer()) : null; }
