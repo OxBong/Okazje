@@ -64,7 +64,7 @@ sudo systemctl restart okazje
 
 say "6/6 Power saving (old Minecraft panel switched OFF, not deleted)"
 for s in wings docker.socket docker containerd mariadb mysql nginx php8.1-fpm php8.2-fpm redis-server redis webmin ModemManager pteroq; do
-  if systemctl list-unit-files "$s.service" "$s" 2>/dev/null | grep -q "^$s"; then sudo systemctl disable --now "$s" >/dev/null 2>&1 && echo "off: $s" || true; fi
+  if systemctl cat "$s" >/dev/null 2>&1; then sudo systemctl disable --now "$s" >/dev/null 2>&1 && echo "off: $s" || true; fi
 done
 sudo systemctl set-default multi-user.target >/dev/null 2>&1 || true
 # Undo later with: sudo systemctl enable --now docker wings nginx mariadb
