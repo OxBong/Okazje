@@ -232,10 +232,14 @@
       var mine = await sb.rpc("claim_runner", { dev: force ? dev : dev }).then(must);
       if (!mine && !force) {
         if (B.cloud) return "a computer is checking";
+        // The home server is the main checker: it always takes over
+        if (B.primary) { await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() }); }
+        else {
         // A computer always takes over from the cloud backup right away
         var rr = await sb.from("runner").select("device").maybeSingle();
         if (!(rr.data && /^Cloud/.test(rr.data.device))) return "another computer is checking";
         await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
+        }
       }
       if (!mine && force) await sb.from("runner").upsert({ user_id: window.DB.uid, device: dev, beat: nowIso() });
       var d = await window.DB.loadAll();
