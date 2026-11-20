@@ -10,6 +10,9 @@ say "1/6 Asking for the PC password (for installing)"
 sudo -v
 
 say "2/6 Installing Node 22 and git"
+# The old PHP source (only needed by the Minecraft panel) is outdated and breaks installs: park it (renamed, not deleted)
+for f in /etc/apt/sources.list.d/*ondrej*; do [ -e "$f" ] && case "$f" in *.disabled) ;; *) sudo mv "$f" "$f.disabled";; esac; done
+sudo apt-get update --allow-releaseinfo-change -qq >/dev/null || sudo apt-get update -qq
 if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/dev/null
   sudo apt-get install -y nodejs >/dev/null
