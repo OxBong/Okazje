@@ -2,9 +2,9 @@
 # Makes the home server as quiet as possible:
 #  1. Sleeps at night (fans off) and wakes itself in the morning. The cloud backup checks while it sleeps.
 #  2. Keeps the CPU cool during the day (no turbo, power-saving), so the fan has less reason to spin up.
-# Run: sudo bash server/quiet.sh [sleep time] [wake time]     default 23:30 and 06:55
+# Run: sudo bash server/quiet.sh [sleep time] [wake time]     default 22:00 and 07:00
 set -euo pipefail
-SLEEP_AT="${1:-23:30}"; WAKE_AT="${2:-06:55}"
+SLEEP_AT="${1:-22:00}"; WAKE_AT="${2:-07:00}"
 [ "$(id -u)" = 0 ] || { echo "Run with sudo"; exit 1; }
 
 cat > /usr/local/bin/okazje-sleep <<SH
