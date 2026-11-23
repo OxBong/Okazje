@@ -274,6 +274,24 @@
   }
 
   window.Checker = { runOnce: runOnce };
+  // "Check now" pressed on the phone website: it saves the time in settings; the device currently checking runs a check
+  if (!B.cloud) {
+    var lastAsk = null;
+    setInterval(function () {
+      if (!window.DB.uid || running) return;
+      window.DB.getSetting("checkNow").then(function (ask) {
+        if (!ask) return;
+        if (lastAsk === null) { lastAsk = ask; if (Date.now() - new Date(ask) > 120e3) return; }
+        else if (ask === lastAsk) return;
+        lastAsk = ask;
+        return Promise.all([B.device(), sb.from("runner").select("device").maybeSingle()]).then(function (x) {
+          if (x[1].data && x[1].data.device !== x[0] && !B.primary) return;   // another device is the checker
+          B.log("check requested from the phone");
+          return runOnce(true).then(function (r) { return window.DB.setSetting("checkNowDone", { at: nowIso(), by: x[0], result: r }); });
+        });
+      }).catch(function () {});
+    }, 30000);
+  }
   // Every 15 minutes (the app also calls runOnce on start and after the computer wakes up)
   setTimeout(function () { runOnce(false); }, 8000);
   setInterval(function () { runOnce(false); }, 15 * 60e3);

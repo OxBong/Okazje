@@ -662,11 +662,15 @@ a.btn { text-decoration: none; display: inline-block; }
 
   function renderAll() { renderItems(); renderHits(); renderSearches(); }
 
+  var lastSnap = null;
   function load() {
     return DB.loadAll().then(function (d) {
       D = d;
       var by = d.runner ? " · checked by " + d.runner + (d.lastRun ? " " + ago(d.lastRun) : "") : "";
-      setSync("Synced" + by, true); if (!editing()) renderAll();
+      setSync("Synced" + by, true);
+      // Only redraw when something changed, and keep the scroll position (fixes jumping while scrolling on iPhone)
+      var snap = JSON.stringify([d.wishlist, d.status, d.hits, d.searches]);
+      if (!editing() && snap !== lastSnap) { lastSnap = snap; var y = window.scrollY; renderAll(); window.scrollTo(0, y); }
     }).catch(function (e) { setSync("Offline. Retrying…", false); console.warn(e); });
   }
   function editing() { return !$("addBox").hidden; }
@@ -711,7 +715,12 @@ a.btn { text-decoration: none; display: inline-block; }
     save(it, isNew ? "Added" + (window.Checker && data.url ? ". Checking it now…" : "") : "Saved").then(function (ok) { if (ok && isNew && data.url && window.Checker) check(true); });
   });
   function check(quiet) {
-    if (!window.Checker) { toast("Checks run on your Mac or PC every 15 minutes"); return; }
+    if (!window.Checker) {   // phone/website: ask the checking computer (home server) to run now
+      DB.setSetting("checkNow", new Date().toISOString())
+        .then(function () { toast("Asked the checker to run now. Results in 1–3 min"); setTimeout(load, 90000); setTimeout(load, 180000); })
+        .catch(function (e) { toast("Couldn't ask: " + (e.message || e)); });
+      return;
+    }
     if (!quiet) toast("Checking now… updates in a minute or two");
     Checker.runOnce(true).then(function (r) { if (!quiet) toast("Check done: " + r); load(); });
   }
@@ -898,7 +907,6 @@ a.btn { text-decoration: none; display: inline-block; }
   };
 
   if (window.okazje && window.okazje.platform === "darwin") document.body.classList.add("mac-app");
-  if (!window.Checker) $("checkBtn").hidden = true;   // website: checks run on the computers
   renderCalendar(); renderAll();
   DB.session().then(function (s) { if (s) afterLogin(); else showLogin(true); });
   setInterval(function () { if (DB.uid) load(); }, 60000);
