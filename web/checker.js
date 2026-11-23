@@ -112,7 +112,7 @@
       await sb.from("hits").delete().eq("id", id); return false;
     }
     if (h.verdict || h.stored) await sb.from("hits").update({ data: h }).eq("id", id);
-    if (topic) { try { await push(topic, h); } catch (e) { B.log("push failed: " + e); } }
+    if (topic && h.verdict && /^BUY/.test(h.verdict)) { try { await push(topic, h); } catch (e) { B.log("push failed: " + e); } }
     B.notify("Okazje: " + h.name, h.price + " zł" + (h.verdict ? " · " + h.verdict.split(".")[0] : ""));
     return true;
   }
