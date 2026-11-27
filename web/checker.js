@@ -154,6 +154,53 @@
     return n;
   }
 
+  var STOP = /^(and|or|the|with|for|new|only|used|like|similar|standard|official|lub|oraz|dla|cali|cale|inch|size|edition|from|price|any)$/;
+  function norm(t) { return String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l"); }
+  function words(t) { return norm(t).split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 3 && !STOP.test(w); }); }
+  function xmlTag(x, t) { var m = x.match(new RegExp("<" + t + "[^>]*>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</" + t + ">")); return m ? m[1].trim() : ""; }
+  var pepperSeen = {}, PEPPER_FEEDS = ["wszystkie", "grupa/elektronika", "grupa/moda", "grupa/dom-i-mieszkanie", "grupa/komputery"];
+  // Pepper.pl watcher (server only): matches deals from Pepper's public RSS feeds against the wishlist
+  async function checkPepper(topic, wishlist) {
+    var items = wishlist.filter(function (i) { return !i.bought && i.used !== "yes"; });
+    if (!items.length) return 0;
+    var xml = "";
+    for (var f = 0; f < PEPPER_FEEDS.length; f++) {
+      try { var r = await B.fetchText("https://www.pepper.pl/rss/" + PEPPER_FEEDS[f]); if (r.status < 400) xml += r.text; } catch (e) {}
+      await sleep(2000);
+    }
+    var seenLink = {};
+    var deals = (xml.match(/<item>[\s\S]*?<\/item>/g) || []).map(function (x) {
+      var m = x.match(/<pepper:merchant name="([^"]*)" price="([^"]*)"/) || [];
+      var desc = xmlTag(x, "description").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return { title: xmlTag(x, "title"), link: xmlTag(x, "link"), shop: m[1] || "", price: parseFloat(String(m[2] || "").replace(/[^0-9,.]/g, "").replace(",", ".")) || null,
+        image: (x.match(/<media:content[^>]*url="([^"]+)"/) || [])[1] || null, desc: desc.slice(0, 400) };
+    }).filter(function (d) { if (!d.link || !d.price || seenLink[d.link]) return false; seenLink[d.link] = 1; return true; });
+    var n = 0, judged = 0;
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i], want = words(it.name + " " + (it.size || "")).filter(function (w, k, a) { return a.indexOf(w) === k; });
+      if (!want.length) continue;
+      for (var j = 0; j < deals.length && judged < 6; j++) {
+        var d = deals[j], have = words(d.title), hits = want.filter(function (w) { return have.indexOf(w) >= 0; }).length;
+        if (hits < Math.min(2, want.length)) continue;
+        if (it.target && d.price > it.target * 1.3) continue;
+        if (it.max && d.price > it.max) continue;
+        if (pepperSeen[it.id + d.link]) continue;
+        pepperSeen[it.id + d.link] = 1;
+        if (await newHit(topic, "pepper:" + it.id + ":" + d.link, { name: it.name + ": " + d.title.slice(0, 120), clothes: it.category === "clothes",
+          criteria: critFor(it, "deal posted on Pepper.pl: " + d.title + " — " + d.desc), price: d.price, target: it.target, url: d.link, image: d.image,
+          desc: joinDesc("Pepper · " + d.shop, overTarget(it, d.price)) })) { n++; judged++; }
+      }
+    }
+    if (n) B.log("Pepper: " + n + " new hit(s)");
+    return n;
+  }
+  function overTarget(it, price) { return it.target && price > it.target ? Math.round(price - it.target) + " zł above your target (" + it.target + " zł), but discounted" : ""; }
+  function joinDesc() { return Array.prototype.filter.call(arguments, Boolean).join(" · "); }
+  function critFor(it, extra) {
+    return it.name + (it.size ? ", wanted size " + it.size : "") + (it.target ? ", target price " + it.target + " zł" : "") + (extra ? ". " + extra : "") +
+      (it.notes ? ". Notes: " + it.notes : "") + ". Judge whether this exact deal matches what the buyer wants; SKIP if it is a different product.";
+  }
+
   // Claude price search (desktop only, 1-2x a day, one computer): cheapest current offer across shops for every item
   async function claudeSearch(topic, d) {
     if (!B.priceSearch || !B.getPref) return 0;
@@ -298,4 +345,12 @@
   setTimeout(function () { runOnce(false); }, 8000);
   setInterval(function () { runOnce(false); }, 15 * 60e3);
   B.onWake(function () { setTimeout(function () { runOnce(false); }, 20000); });
+  if (B.platform === "server") setInterval(async function () {
+    try {
+      if (window.DB.uid && !running) {
+        var d = await window.DB.loadAll(), topic = await window.DB.getSetting("ntfy");
+        await checkPepper(topic, d.wishlist);
+      }
+    } catch (e) { B.log("Pepper watch error: " + (e.message || e)); }
+  }, 5 * 60e3);
 })();
