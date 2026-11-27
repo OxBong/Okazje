@@ -219,7 +219,7 @@
         var it = d.wishlist.find(function (i) { return i.id === x.item; });
         return { title: deal.title, price: deal.price, shop: deal.shop, url: deal.link, image: deal.image, item: it ? it.id : null, itemName: it ? it.name : null,
           pick: /^BUY/i.test(x.pick) ? "BUY" : "LOOK", why: String(x.why || "").slice(0, 300) };
-      }).filter(Boolean).slice(0, 12);
+      }).filter(Boolean).slice(0, 15);
       await window.DB.setSetting("suggestions", { at: nowIso(), deals: deals.length, list: out });
       B.log("suggestions: " + out.length + " pick(s) from " + deals.length + " deals");
     } finally { suggesting = false; }

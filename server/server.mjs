@@ -128,9 +128,9 @@ async function suggest(input) {
 Pick the deals that are genuinely worth it for THIS buyer:
 - Deals for something on the wishlist that are a real discount, EVEN IF the price is above the buyer's target. Targets are often set too low; judge against the usual price (notes, nowAt, cheapestFound) instead. Example: target 230 zł, usual 339 zł, deal 249 zł = good pick.
 - Respect the notes (colour, model, size, new/used, things to avoid). Skip other models or editions.
-- Up to 5 deals that are NOT on the wishlist but are genuinely great value for a typical student (e.g. a good powerbank, headphones, chargers, everyday tech, basics in their style or sizes): well-known brand, solid reviews, price clearly under the usual price. Mark these LOOK unless the deal is exceptional.
+- Up to 6 great deals that are NOT on the wishlist: things almost anyone would be glad to have (e.g. a good powerbank, headphones, a charger, a backpack, basics) or that fit the buyer's interests, but ONLY when the price is clearly exceptional (big real discount, close to the lowest price ever) and the product is well reviewed. Mark these LOOK unless the deal is outstanding.
 - Skip fake discounts, unknown marketplace sellers and anything you are not sure is the same product.
-Return 0-12 picks, best first. Reply with ONLY a JSON array, no other text:
+Return 0-15 picks, best first. Reply with ONLY a JSON array, no other text:
 [{"n":<deal number>,"item":"<wishlist id, or null if not on the wishlist>","pick":"BUY or LOOK","why":"<max 200 chars: why it's worth it, how far from the target and the usual price>"}]
 
 Buyer's sizes: ${JSON.stringify(input.sizes || {})}
