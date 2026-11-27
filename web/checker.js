@@ -175,6 +175,7 @@
       return { title: xmlTag(x, "title"), link: xmlTag(x, "link"), shop: m[1] || "", price: parseFloat(String(m[2] || "").replace(/[^0-9,.]/g, "").replace(",", ".")) || null,
         image: (x.match(/<media:content[^>]*url="([^"]+)"/) || [])[1] || null, desc: desc.slice(0, 400) };
     }).filter(function (d) { if (!d.link || !d.price || seenLink[d.link]) return false; seenLink[d.link] = 1; return true; });
+    deals.forEach(function (d) { if (!dealPool[d.link]) dealPool[d.link] = Object.assign({ seen: Date.now() }, d); });
     var n = 0, judged = 0;
     for (var i = 0; i < items.length; i++) {
       var it = items[i], want = words(it.name + " " + (it.size || "")).filter(function (w, k, a) { return a.indexOf(w) === k; });
@@ -193,6 +194,35 @@
     }
     if (n) B.log("Pepper: " + n + " new hit(s)");
     return n;
+  }
+  // ---- Claude's picks: every ~3 h (or when asked from the app) Claude reads the wishlist + recent Pepper deals
+  // and suggests discounts worth it, even when a target price was set too low. Saved in settings "suggestions".
+  var dealPool = {}, suggesting = false;
+  async function makeSuggestions(d) {
+    if (suggesting || !B.suggest) return;
+    suggesting = true;
+    try {
+      var cut = Date.now() - 36 * 3600e3;
+      Object.keys(dealPool).forEach(function (k) { if (dealPool[k].seen < cut) delete dealPool[k]; });
+      var deals = Object.keys(dealPool).map(function (k) { return dealPool[k]; }).sort(function (a, b) { return b.seen - a.seen; }).slice(0, 180);
+      if (!deals.length) { B.log("suggestions: no Pepper deals collected yet"); return; }
+      var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
+      var wants = d.wishlist.filter(function (i) { return !i.bought; }).map(function (i) {
+        var st = d.status[i.id] || {};
+        return { id: i.id, name: i.name, category: i.category, size: i.size || "", used: i.used, target: i.target, max: i.max, notes: String(i.notes || "").slice(0, 300),
+          nowAt: st.price || null, cheapestFound: st.best ? st.best.price + " zł at " + st.best.shop : null };
+      });
+      var list = await B.suggest({ wishlist: wants, sizes: sz, deals: deals.map(function (x, n) { return { n: n + 1, title: x.title, price: x.price, shop: x.shop, desc: x.desc.slice(0, 200) }; }) });
+      if (!Array.isArray(list)) { B.log("suggestions: no answer from Claude"); return; }
+      var out = list.map(function (x) {
+        var deal = deals[(x.n | 0) - 1]; if (!deal) return null;
+        var it = d.wishlist.find(function (i) { return i.id === x.item; });
+        return { title: deal.title, price: deal.price, shop: deal.shop, url: deal.link, image: deal.image, item: it ? it.id : null, itemName: it ? it.name : null,
+          pick: /^BUY/i.test(x.pick) ? "BUY" : "LOOK", why: String(x.why || "").slice(0, 300) };
+      }).filter(Boolean).slice(0, 12);
+      await window.DB.setSetting("suggestions", { at: nowIso(), deals: deals.length, list: out });
+      B.log("suggestions: " + out.length + " pick(s) from " + deals.length + " deals");
+    } finally { suggesting = false; }
   }
   function overTarget(it, price) { return it.target && price > it.target ? Math.round(price - it.target) + " zł above your target (" + it.target + " zł), but discounted" : ""; }
   function joinDesc() { return Array.prototype.filter.call(arguments, Boolean).join(" · "); }
@@ -358,4 +388,21 @@
       }
     } catch (e) { B.log("Pepper watch error: " + (e.message || e)); }
   }, 5 * 60e3);
+  if (B.platform === "server") {
+    var lastSug = 0, lastSugAsk = null;
+    setInterval(async function () {
+      if (!window.DB.uid || suggesting) return;
+      try {
+        var ask = await window.DB.getSetting("suggestRequest");
+        var asked = ask && ask !== lastSugAsk && Date.now() - new Date(ask) < 30 * 60e3;
+        if (!asked && Date.now() - lastSug < 3 * 3600e3) return;
+        if (!asked && !Object.keys(dealPool).length) return;          // wait until the Pepper watcher collected deals
+        if (asked && !Object.keys(dealPool).length) {                  // asked right after a restart: collect now
+          var d0 = await window.DB.loadAll(); await checkPepper(await window.DB.getSetting("ntfy"), d0.wishlist);
+        }
+        lastSugAsk = ask; lastSug = Date.now();
+        await makeSuggestions(await window.DB.loadAll());
+      } catch (e) { B.log("suggestions error: " + (e.message || e)); }
+    }, 60000);
+  }
 })();

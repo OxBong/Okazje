@@ -121,6 +121,25 @@ async function verdict(hit, criteria) {
   if (!/^(BUY|MAYBE|SKIP)/.test(out)) { if (out) log("claude: " + out.slice(0, 200)); return null; }
   return out.length > 2500 ? out.slice(0, 2500) + "..." : out;
 }
+// Claude's picks: which of the recent Pepper deals are worth it for this buyer
+async function suggest(input) {
+  if (!findClaude()) return null;
+  const prompt = `You are a careful shopping assistant for a student in Gdynia, Poland. Below is the buyer's wishlist (with notes, target prices and the prices seen so far) and a numbered list of deals posted on Pepper.pl in the last day and a half.
+Pick the deals that are genuinely worth it for THIS buyer:
+- Deals for something on the wishlist that are a real discount, EVEN IF the price is above the buyer's target. Targets are often set too low; judge against the usual price (notes, nowAt, cheapestFound) instead. Example: target 230 zł, usual 339 zł, deal 249 zł = good pick.
+- Respect the notes (colour, model, size, new/used, things to avoid). Skip other models or editions.
+- At most 3 deals that are NOT on the wishlist but clearly fit what the buyer wants or would need (same interests, accessories for wishlist items), only if they are exceptional.
+- Skip fake discounts, unknown marketplace sellers and anything you are not sure is the same product.
+Return 0-12 picks, best first. Reply with ONLY a JSON array, no other text:
+[{"n":<deal number>,"item":"<wishlist id, or null if not on the wishlist>","pick":"BUY or LOOK","why":"<max 200 chars: why it's worth it, how far from the target and the usual price>"}]
+
+Buyer's sizes: ${JSON.stringify(input.sizes || {})}
+Wishlist: ${JSON.stringify(input.wishlist)}
+Deals: ${JSON.stringify(input.deals)}`;
+  const out = await runClaude(["-p", "--model", "sonnet", "--max-turns", "1"], prompt, 300000);
+  const m = String(out || "").match(/\[[\s\S]*\]/);
+  try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
+}
 async function priceSearch(items, ctx) {
   if (!findClaude() || !items || !items.length) return null;
   const list = items.map((i, n) => `${n + 1}. id=${i.id} | ${i.name}${i.size ? " | size " + i.size : ""}${i.target ? " | target " + i.target + " zl" : ""}${i.used === "yes" ? " | used OK" : " | new only"}${i.url ? " | tracked link: " + i.url : ""}${i.notes ? " | notes: " + String(i.notes).slice(0, 200) : ""}`).join("\n");
@@ -151,6 +170,7 @@ const window = {
     onWake: () => {},
     verdict,
     priceSearch,
+    suggest,
     getPref: async (k) => (k === "priceSearch" ? (process.env.OKAZJE_PRICE_SEARCH || "daily") : null),
     fetchRendered,
     fetchText: async (url, opts = {}) => {
