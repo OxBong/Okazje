@@ -225,6 +225,22 @@
       B.log("suggestions: " + out.length + " pick(s) from " + deals.length + " deals");
     } finally { suggesting = false; }
   }
+  // ---- Resell finds (server, 2x a day 07-22): Claude searches public Vinted pages for clothes with 50+ zł resale profit
+  async function makeResell() {
+    if (!B.resell) return;
+    var cur = await window.DB.getSetting("resell").catch(function () { return null; });
+    var ask = await window.DB.getSetting("resellRequest").catch(function () { return null; });
+    var asked = ask && (!cur || !cur.at || ask > cur.at);
+    if (!asked && cur && cur.at && Date.now() - new Date(cur.at) < 11 * 3600e3) return;
+    if (new Date().getHours() < 7) return;
+    var cfg = (await window.DB.getSetting("resellCfg").catch(function () { return null; })) || {};
+    await window.DB.setSetting("resell", Object.assign({}, cur || {}, { at: nowIso(), busy: true }));
+    B.log("resell search started");
+    var res = await B.resell({ brands: cfg.brands, minProfit: cfg.minProfit || 50, maxPrice: cfg.maxPrice || 200 });
+    var list = (res || []).filter(function (x) { return x && /^https:\/\/(www\.)?vinted\.pl\//.test(x.url || "") && Number(x.profit) >= (cfg.minProfit || 50); }).slice(0, 10);
+    await window.DB.setSetting("resell", { at: nowIso(), list: res ? list : ((cur && cur.list) || []), error: res ? null : "Claude gave no answer" });
+    B.log("resell search done: " + list.length);
+  }
   function overTarget(it, price) { return it.target && price > it.target ? Math.round(price - it.target) + " zł above your target (" + it.target + " zł), but discounted" : ""; }
   function joinDesc() { return Array.prototype.filter.call(arguments, Boolean).join(" · "); }
   function critFor(it, extra) {
@@ -405,5 +421,11 @@
         await makeSuggestions(await window.DB.loadAll());
       } catch (e) { B.log("suggestions error: " + (e.message || e)); }
     }, 60000);
+    var resellBusy = false;
+    setInterval(async function () {
+      if (!window.DB.uid || resellBusy) return;
+      resellBusy = true;
+      try { await makeResell(); } catch (e) { B.log("resell error: " + (e.message || e)); } finally { resellBusy = false; }
+    }, 5 * 60e3);
   }
 })();

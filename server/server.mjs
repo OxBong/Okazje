@@ -140,6 +140,19 @@ Deals: ${JSON.stringify(input.deals)}`;
   const m = String(out || "").match(/\[[\s\S]*\]/);
   try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
 }
+// Resell finds: Claude searches public Vinted pages on the web for underpriced clothes worth reselling
+async function resell(ctx) {
+  if (!findClaude()) return null;
+  const prompt = `You help a student in Gdynia, Poland find clothes on Vinted.pl to buy and resell for profit. Today is ${new Date().toISOString().slice(0, 10)}.
+Use web search to find CURRENT public Vinted.pl listings (vinted.pl/items/...) of brands that resell well: ${(ctx && ctx.brands) || "Carhartt, Stone Island, Arc'teryx, Ralph Lauren, The North Face, vintage Levi's, Nike vintage, Patagonia"}.
+For each candidate open the listing page, read price, size, condition and photos description. Estimate the realistic resale price on Vinted/OLX in Poland (based on similar sold or listed items) and the profit after ~10 zł shipping and ~5% Vinted fees.
+Only include items with estimated profit of at least ${(ctx && ctx.minProfit) || 50} zł and price up to ${(ctx && ctx.maxPrice) || 200} zł, still available, authentic-looking (skip fakes, bad condition, vague listings). Max 10, best profit first.
+Reply with ONLY a JSON array, no other text:
+[{"title":"<item>","price":<zl>,"resale":<zl estimate>,"profit":<zl>,"size":"<size>","url":"<https://www.vinted.pl/items/...>","why":"<max 200 chars: why it resells, condition, risk>"}]`;
+  const out = await runClaude(["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "50"], prompt, 1500000);
+  const m = String(out || "").match(/\[[\s\S]*\]/);
+  try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
+}
 async function priceSearch(items, ctx) {
   if (!findClaude() || !items || !items.length) return null;
   const list = items.map((i, n) => `${n + 1}. id=${i.id} | ${i.name}${i.size ? " | size " + i.size : ""}${i.target ? " | target " + i.target + " zl" : ""}${i.used === "yes" ? " | used OK" : " | new only"}${i.url ? " | tracked link: " + i.url : ""}${i.notes ? " | notes: " + String(i.notes).slice(0, 200) : ""}`).join("\n");
@@ -171,6 +184,7 @@ const window = {
     verdict,
     priceSearch,
     suggest,
+    resell,
     getPref: async (k) => (k === "priceSearch" ? (process.env.OKAZJE_PRICE_SEARCH || "daily") : null),
     fetchRendered,
     fetchText: async (url, opts = {}) => {

@@ -245,6 +245,9 @@ a.btn { text-decoration: none; display: inline-block; }
   <div class="setp-grid sug-wrap">
     <p class="checked" id="sugInfo">Loading…</p>
     <div class="hits" id="sugList"></div>
+    <h2 style="margin:24px 0 8px">Resell finds (Vinted)</h2>
+    <p class="checked" id="resInfo">Loading…</p>
+    <div class="hits" id="resList"></div>
   </div>
 </div>
 <div class="setp" id="setPanel" hidden>
@@ -905,11 +908,27 @@ a.btn { text-decoration: none; display: inline-block; }
     });
   }
   function loadSug() { return DB.getSetting("suggestions").then(function (sg) { renderSug(sg); return sg; }).catch(function (e) { $("sugInfo").textContent = "Couldn't load: " + (e.message || e); }); }
-  $("sugOpen").onclick = function () { $("sugPanel").hidden = false; document.body.style.overflow = "hidden"; loadSug(); };
+  function loadRes() {
+    return DB.getSetting("resell").then(function (r) {
+      var box = $("resList"); box.textContent = "";
+      if (!r || !r.at) { $("resInfo").textContent = "No resell finds yet. Claude searches Vinted twice a day (50+ zł profit)."; return; }
+      $("resInfo").textContent = r.busy ? "Claude is searching Vinted now (up to 25 min)…" : ((r.list || []).length + " find(s) with 50+ zł estimated profit · updated " + when(r.at) + (r.error ? " · " + r.error : ""));
+      (r.list || []).forEach(function (x) {
+        var c = el("div", "hit"), b = el("div", "b");
+        b.append(el("div", "pick buy", "+" + Math.round(x.profit) + " zł PROFIT (est.)"));
+        var a = el("a", null, x.title); a.href = x.url; a.target = "_blank"; a.rel = "noopener";
+        b.append(a, el("div", "pr", zl(x.price)), el("div", "m", ["resell ~" + zl(x.resale), x.size].filter(Boolean).join(" · ")));
+        if (x.why) b.append(el("div", "v", x.why));
+        c.append(b); box.append(c);
+      });
+    }).catch(function () {});
+  }
+  $("sugOpen").onclick = function () { $("sugPanel").hidden = false; document.body.style.overflow = "hidden"; loadSug(); loadRes(); };
   $("sugClose").onclick = function () { $("sugPanel").hidden = true; document.body.style.overflow = ""; };
   var sugWait = null;
   $("sugRefresh").onclick = function () {
     var asked = new Date().toISOString(), btn = $("sugRefresh"); btn.disabled = true;
+    DB.setSetting("resellRequest", asked).catch(function () {});
     DB.setSetting("suggestRequest", asked).then(function () {
       $("sugInfo").textContent = "Asked the home server. Claude is reading the deals, this takes 1-3 minutes…";
       clearInterval(sugWait); var tries = 0;
