@@ -411,6 +411,8 @@ a.btn { text-decoration: none; display: inline-block; }
   "use strict";
   var D = { wishlist: [], status: {}, hits: [], searches: [] }, filter = "all", pendingDelete = null;
   var $ = function (id) { return document.getElementById(id); };
+  // Bigger images: Pepper thumbnails (/re/150x150/) and OLX 800x600 links -> high resolution
+  function hires(u) { return String(u || "").replace(/\/re\/\d+x\d+\//, "/re/1024x1024/").replace(/;s=\d+x\d+/, ";s=1600x1200").replace(/([?&])(w|width)=\d+/, "$1$2=1200"); }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function num(v) { if (v === "" || v == null) return null; var n = typeof v === "number" ? v : parseFloat(v); return isFinite(n) ? n : null; }
   function zl(v) { var n = num(v); return n == null ? "–" : n.toLocaleString("pl-PL", { maximumFractionDigits: n % 1 ? 2 : 0 }) + " zł"; }
@@ -629,7 +631,7 @@ a.btn { text-decoration: none; display: inline-block; }
   }
   function lightbox(list, start) {
     var lb = el("div", "lb"), x = el("button", "btn small", "Close");
-    list.forEach(function (u) { var im = el("img"); im.src = u; im.alt = ""; lb.append(im); });
+    list.forEach(function (u) { var im = el("img"); im.src = hires(u); im.alt = ""; lb.append(im); });
     x.onclick = function () { lb.remove(); x.remove(); }; lb.onclick = function (e) { if (e.target === lb) x.onclick(); };
     document.body.append(lb, x); lb.scrollLeft = start * lb.clientWidth;
   }
@@ -644,7 +646,7 @@ a.btn { text-decoration: none; display: inline-block; }
       if (h.time && Date.now() - new Date(h.time) < 864e5) c.classList.add("new");
       if (list.length) {
         var wrap = el("div", "gal-wrap"), g = el("div", "gal");
-        list.forEach(function (u, i) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = u; im.onerror = function () { im.remove(); }; im.onclick = function () { lightbox(list, i); }; g.append(im); });
+        list.forEach(function (u, i) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = hires(u); im.onerror = function () { im.remove(); }; im.onclick = function () { lightbox(list, i); }; g.append(im); });
         wrap.append(g); if (list.length > 1) wrap.append(el("span", "gal-n", list.length + " photos"));
         c.append(wrap);
       }
@@ -893,7 +895,7 @@ a.btn { text-decoration: none; display: inline-block; }
     $("sugInfo").textContent = (sg.list.length ? sg.list.length + " pick(s)" : "Nothing worth it right now") + " from " + (sg.deals || 0) + " recent Pepper deals · updated " + when(sg.at);
     sg.list.forEach(function (x) {
       var c = el("div", "hit");
-      if (x.image) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = x.image; im.onerror = function () { im.remove(); }; c.append(im); }
+      if (x.image) { var im = el("img"); im.loading = "lazy"; im.alt = ""; im.src = hires(x.image); im.onerror = function () { im.remove(); }; c.append(im); }
       var b = el("div", "b");
       b.append(el("div", "pick" + (x.pick === "BUY" ? " buy" : ""), x.pick === "BUY" ? "BUY" : "WORTH A LOOK"));
       var a = el("a", null, x.title); if (/^https:\/\//.test(x.url || "")) { a.href = x.url; a.target = "_blank"; a.rel = "noopener"; }

@@ -175,7 +175,8 @@
       return { title: xmlTag(x, "title"), link: xmlTag(x, "link"), shop: m[1] || "", price: parseFloat(String(m[2] || "").replace(/[^0-9,.]/g, "").replace(",", ".")) || null,
         image: (x.match(/<media:content[^>]*url="([^"]+)"/) || [])[1] || null, desc: desc.slice(0, 400) };
     }).filter(function (d) { if (!d.link || !d.price || seenLink[d.link]) return false; seenLink[d.link] = 1; return true; });
-    deals.forEach(function (d) { if (!dealPool[d.link]) dealPool[d.link] = Object.assign({ seen: Date.now() }, d); });
+    var MARKET = /allegro|aliexpress|temu|shein|ebay|wish\b|joom|olx|vinted|banggood|dhgate|amazon\s*marketplace/i;
+    deals.forEach(function (d) { if (MARKET.test(d.shop + " " + d.link)) return; if (!dealPool[d.link]) dealPool[d.link] = Object.assign({ seen: Date.now() }, d); });
     var n = 0, judged = 0;
     for (var i = 0; i < items.length; i++) {
       var it = items[i], want = words(it.name + " " + (it.size || "")).filter(function (w, k, a) { return a.indexOf(w) === k; });
@@ -292,7 +293,7 @@
           var h = {
             criteria: s.criteria, name: s.name + ": " + o.title, price: price, target: s.max, url: o.url,
             city: o.location && o.location.city ? o.location.city.name : null,
-            image: ph[0] ? ph[0].link.replace("{width}", "800").replace("{height}", "600") : null,
+            image: ph[0] ? ph[0].link.replace("{width}", "1600").replace("{height}", "1200") : null,
             photos: ph.slice(0, 6).map(function (x) { return x.link.replace("{width}", "1200").replace("{height}", "900").replace(":443/", "/"); }),
             desc: desc.length > 220 ? desc.slice(0, 220) + "..." : desc, fullDesc: desc.slice(0, 3000)
           };
