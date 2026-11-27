@@ -139,26 +139,6 @@ Reply with ONLY a JSON array, one object per product, no other text:
   try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
 }
 
-async function suggest(items, ctx) {
-  if (!findClaude() || !items || !items.length) return null;
-  const list = items.map((i) => `- ${i.name}${i.size ? " (size " + i.size + ")" : ""}${i.target ? " | wished price " + i.target + " zl" : ""}${i.notes ? " | notes: " + String(i.notes).slice(0, 150) : ""}`).join("\n");
-  const prompt = `You are a personal deal scout for a buyer in Gdynia, Poland. Today is ${new Date().toISOString().slice(0, 10)}.
-Their wishlist (the "wished price" is only a wish, it may be unrealistically low):
-${list}
-Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}. ${(ctx && ctx.profile) || ""}
-
-Search the web (Pepper.pl hot deals, Ceneo price history, big Polish shops and their sale pages) for CURRENT real discounts that this buyer would want:
-1. Deals on wishlist items, even if above the wished price, when it is a genuinely good price (compare with the usual price / 30-day low).
-2. A few closely related things they would likely need or want (same style, accessories, a better or cheaper alternative model), only if genuinely discounted.
-Skip fake discounts, out-of-stock items, marketplace scams. Valid public promo codes are OK (say the code). Max 12 suggestions, best first.
-
-Reply with ONLY a JSON array, no other text:
-[{"title":"<product>","forItem":"<wishlist item name or 'new idea'>","price":<zl number>,"usual":<usual price zl or null>,"shop":"<shop>","url":"<direct https link>","verdict":"<WORTH IT|MAYBE>","why":"<max 200 chars why it's worth it for this buyer>"}]`;
-  const out = await runClaude(["-p", "--model", "sonnet", "--allowedTools", "WebSearch,WebFetch", "--max-turns", "60"], prompt, 1500000);
-  const m = String(out || "").match(/\[[\s\S]*\]/);
-  try { const a = m && JSON.parse(m[0]); return Array.isArray(a) ? a : null; } catch { return null; }
-}
-
 // ---- run the app's checker in a sandbox with this bridge ----
 const window = {
   supabase,
@@ -171,7 +151,6 @@ const window = {
     onWake: () => {},
     verdict,
     priceSearch,
-    suggest,
     getPref: async (k) => (k === "priceSearch" ? (process.env.OKAZJE_PRICE_SEARCH || "daily") : null),
     fetchRendered,
     fetchText: async (url, opts = {}) => {

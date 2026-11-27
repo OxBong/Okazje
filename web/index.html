@@ -66,9 +66,6 @@ body.mac-app .lb button { top: 40px; }
 .setp[hidden] { display: none; }
 body.mac-app .setp { padding-top: 40px; }
 .setp-top { max-width: 1120px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: space-between; }
-.sug-meta { max-width: 1120px; margin: 0 auto 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
-.sug-grid { max-width: 1120px; margin: 0 auto; }
-.hit .vd { font-size: 12px; font-weight: 800; letter-spacing: .04em; color: var(--accent); }
 .setp-top h2 { font-size: 22px; font-weight: 800; }
 .setp-grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 @media (max-width: 420px) { .setp-grid { grid-template-columns: minmax(0,1fr); } }
@@ -239,11 +236,6 @@ a.btn { text-decoration: none; display: inline-block; }
     <div class="row"><button class="add-btn" type="submit">Log in</button><button class="add-btn ghost" type="button" id="lSignup">Create account</button></div>
   </form>
 </div>
-<div class="setp" id="sugPanel" hidden>
-  <div class="setp-top"><h2>Suggestions</h2><button class="btn small" type="button" id="sugClose">Close</button></div>
-  <div class="sug-meta"><span id="sugInfo">Loading…</span><button class="btn small" type="button" id="sugRefresh">Ask Claude again</button></div>
-  <div class="hits sug-grid" id="sugList"></div>
-</div>
 <div class="setp" id="setPanel" hidden>
   <div class="setp-top"><h2>Settings</h2><button class="btn small" type="button" id="setClose">Close</button></div>
   <div class="setp-grid">
@@ -308,7 +300,6 @@ a.btn { text-decoration: none; display: inline-block; }
   </div>
   <div class="topbtns">
     <button class="add-btn ghost icon" id="setOpen" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
-    <button class="add-btn ghost" id="sugOpen" type="button">Suggestions</button>
     <button class="add-btn ghost" id="checkBtn" type="button">Check now</button>
     <button class="add-btn" id="openAdd" type="button"><span aria-hidden="true">+</span> Add</button>
   </div>
@@ -882,34 +873,9 @@ a.btn { text-decoration: none; display: inline-block; }
   $("cNew").onclick = function () { if (!chatBusy) { chat = []; saveChat(); } };
   renderChat();
 
-  // Suggestions tab: Claude's picks of current discounts worth it (filled by the checker 1-2x a day)
-  function renderSug() {
-    DB.getSetting("suggestions").catch(function () { return null; }).then(function (v) {
-      var box = $("sugList"); box.innerHTML = "";
-      var list = (v && v.list) || [];
-      $("sugInfo").textContent = v && v.busy ? "Claude is searching now (takes up to 25 min)…" :
-        v && v.at ? "Updated " + new Date(v.at).toLocaleString("pl-PL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + (v.error ? " · " + v.error : "") + " · refreshes 1-2× a day" :
-        "No suggestions yet. Press \u201cAsk Claude again\u201d.";
-      list.forEach(function (r) {
-        var c = el("article", "hit"), b = el("div", "b");
-        b.append(el("span", "vd", r.verdict || "WORTH IT"), el("h3", null, r.title));
-        var pr = zl(r.price) + (r.usual ? " (usually " + zl(r.usual) + ")" : "") + " · " + (r.shop || "");
-        b.append(el("div", null, pr));
-        if (r.forItem) b.append(el("div", "checked", r.forItem === "new idea" ? "New idea for you" : "For: " + r.forItem));
-        if (r.why) b.append(el("div", null, r.why));
-        var a = el("a", "btn small", "Open shop"); a.href = r.url; a.target = "_blank"; a.rel = "noopener";
-        b.append(a); c.append(b); box.append(c);
-      });
-    });
-  }
-  $("sugOpen").onclick = function () { $("sugPanel").hidden = false; document.body.style.overflow = "hidden"; renderSug(); };
-  $("sugClose").onclick = function () { $("sugPanel").hidden = true; document.body.style.overflow = ""; };
-  $("sugRefresh").onclick = function () {
-    DB.setSetting("suggestNow", new Date().toISOString()).then(function () { $("sugInfo").textContent = "Asked. The checker starts Claude on its next round; come back in about 30-45 min."; });
-  };
   $("setOpen").onclick = function () { $("setPanel").hidden = false; document.body.style.overflow = "hidden"; };
   $("setClose").onclick = function () { $("setPanel").hidden = true; document.body.style.overflow = ""; };
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("setPanel").hidden) $("setClose").onclick(); if (e.key === "Escape" && !$("sugPanel").hidden) $("sugClose").onclick(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("setPanel").hidden) $("setClose").onclick(); });
 
   // Login + settings
   function showLogin(on) { $("login").hidden = !on; document.body.classList.toggle("locked", on); }
