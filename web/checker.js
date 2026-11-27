@@ -133,9 +133,9 @@
         var img = (r.text.match(/property="og:image"\s+content="([^"]+)"/) || [])[1] || null;
         if (price) {
           e.price = price; e.ok = true;
-          var hit = (it.target && price <= it.target) || (!it.target && e.lastPrice && price <= 0.95 * e.lastPrice);
+          var hit = (it.target && price <= it.target) || (e.lastPrice && price <= 0.95 * e.lastPrice);   // under target, or any drop of 5%+
           if (hit && price !== e.lastPrice) {
-            if (await newHit(topic, it.id + ":" + price, { name: it.name, clothes: it.category === "clothes", criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł, new from a legit Polish shop" + (it.notes ? ". Notes: " + it.notes : ""), price: price, target: it.target, was: e.lastPrice, url: it.url, image: img, desc: e.lastPrice ? "Was " + e.lastPrice + " zł" : "" })) n++;
+            if (await newHit(topic, it.id + ":" + price, { name: it.name, clothes: it.category === "clothes", criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł, new from a legit Polish shop" + (it.notes ? ". Notes: " + it.notes : ""), price: price, target: it.target, was: e.lastPrice, url: it.url, image: img, desc: (e.lastPrice ? "Was " + e.lastPrice + " zł" : "") + (it.target && price > it.target ? " · above your target " + it.target + " zł, but discounted" : "") })) n++;
           }
         } else {
           fails++; e.error = blocked(r) ? "The shop blocked the check" : r.status >= 400 ? "Shop error " + r.status : "Price not found on the page";
@@ -176,10 +176,11 @@
       if (!it || !(Number(r.price) > 0) || !/^https:\/\//.test(r.url || "")) continue;
       var prev = fresh[it.id] || {}, price = Number(r.price);
       var best = { price: price, shop: String(r.shop || "").slice(0, 40), url: r.url, note: String(r.note || "").slice(0, 160), at: nowIso() };
-      if (it.target && price <= it.target && !(prev.best && prev.best.price === price && prev.best.url === r.url)) {
+      var ref = prev.price || prev.lastPrice;
+      if (((it.target && price <= it.target) || (ref && price <= 0.9 * ref)) && !(prev.best && prev.best.price === price && prev.best.url === r.url)) {
         if (await newHit(topic, it.id + ":best:" + price + ":" + best.shop, { name: it.name, clothes: it.category === "clothes",
           criteria: it.name + (it.size ? ", wanted size " + it.size : "") + ", target price " + it.target + " zł" + (it.notes ? ". Notes: " + it.notes : ""),
-          price: price, target: it.target, url: r.url, desc: best.shop + (best.note ? " · " + best.note : "") })) n++;
+          price: price, target: it.target, url: r.url, desc: best.shop + (best.note ? " · " + best.note : "") + (it.target && price > it.target ? " · above your target " + it.target + " zł, but " + Math.round(100 - 100 * price / ref) + "% under the tracked price" : "") })) n++;
       }
       rows.push({ user_id: window.DB.uid, id: it.id, data: Object.assign({}, prev, { name: it.name, best: best }) });
     }
