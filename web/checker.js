@@ -343,7 +343,12 @@
   }
   // Every 15 minutes (the app also calls runOnce on start and after the computer wakes up)
   setTimeout(function () { runOnce(false); }, 8000);
-  setInterval(function () { runOnce(false); }, 15 * 60e3);
+// Random timing: wait 10-20 min (a new random number every time), check, then plan the next one
+(function next() {
+  var wait = (10 + Math.random() * 10) * 60e3;
+  B.log("next check in " + (wait / 60e3).toFixed(1) + " min");
+  setTimeout(function () { runOnce(false).finally(next); }, wait);
+})();
   B.onWake(function () { setTimeout(function () { runOnce(false); }, 20000); });
   if (B.platform === "server") setInterval(async function () {
     try {
