@@ -118,13 +118,13 @@
     return true;
   }
 
-  async function checkItems(topic, items, oldStatus) {
+  async function checkItems(topic, items, oldStatus, force) {
     var rows = [], n = 0;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (it.bought || !/^https:\/\//.test(it.url || "") || /olx\.pl|pepper\.pl|\/search|query=/.test(it.url) || (CLOUD_BLOCKED.test(it.url) && !B.fetchRendered) || (B.primary && CLOUD_BLOCKED.test(it.url))) continue;
       var prev = oldStatus[it.id] || {}, fails = prev.fails || 0;
-      if (fails >= 3 && prev.checked && Date.now() - new Date(prev.checked) < 6 * 3600e3) continue;
+      if (!force && fails >= 3 && prev.checked && Date.now() - new Date(prev.checked) < 6 * 3600e3) continue;
       var e = { name: it.name, url: it.url, target: it.target, price: null, lastPrice: prev.price || prev.lastPrice || null, ok: false, checked: nowIso(), by: curDev };
       if (prev.best) e.best = prev.best;
       try {
@@ -250,7 +250,7 @@
               var st = d0.status[it.id] || {};
               return CLOUD_BLOCKED.test(it.url || "") || (!st.ok && /^Home server/.test(st.by || "") && /blocked|Shop error|not found|open the page/.test(st.error || ""));
             });
-            var m0 = left.length ? await checkItems(topic0, left, d0.status) : 0;
+            var m0 = left.length ? await checkItems(topic0, left, d0.status, force) : 0;
             return "the home server is checking" + (left.length ? "; " + left.length + " blocked shop page(s) checked here, " + m0 + " new hit(s)" : "");
           }
           return "another computer is checking";
@@ -263,7 +263,7 @@
       var topic = await window.DB.getSetting("ntfy");
       var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
       sizesText = sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "";
-      var n = await checkItems(topic, d.wishlist, d.status) + await checkSearches(topic, d.searches);
+      var n = await checkItems(topic, d.wishlist, d.status, force) + await checkSearches(topic, d.searches);
       try { n += await claudeSearch(topic, d); } catch (e) { B.log("Claude price search error: " + (e.message || e)); }
       await sb.from("runner").update({ beat: nowIso() }).eq("user_id", window.DB.uid);
       if (topic) B.fetchText("https://ntfy.sh/" + topic + "-hb", { method: "POST", body: "up" }).catch(function () {});
