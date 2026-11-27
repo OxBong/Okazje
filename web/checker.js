@@ -237,6 +237,27 @@
     return n;
   }
 
+  // Claude suggestions (Suggestions tab): good current discounts on wishlist items and related things, ignoring strict targets
+  async function claudeSuggest(d) {
+    if (!B.suggest || !B.getPref) return;
+    var mode = (await B.getPref("priceSearch")) || "daily";
+    if (mode === "off" || new Date().getHours() < 7) return;
+    var cur = await window.DB.getSetting("suggestions").catch(function () { return null; });
+    var ask = await window.DB.getSetting("suggestNow").catch(function () { return null; });
+    var last = cur && cur.at, asked = ask && (!last || new Date(ask) > new Date(last));
+    if (!asked && last && Date.now() - new Date(last) < (mode === "twice" ? 11 : 22) * 3600e3) return;
+    var items = d.wishlist.filter(function (i) { return !i.bought; });
+    if (!items.length) return;
+    await window.DB.setSetting("suggestions", Object.assign({}, cur || {}, { at: nowIso(), busy: true }));
+    var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
+    B.log("Claude suggestions started");
+    var res = await B.suggest(items.map(function (i) { return { name: i.name, size: i.size, target: i.target, notes: i.notes }; }),
+      { sizes: sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "" });
+    var list = (res || []).filter(function (r) { return r && r.title && Number(r.price) > 0 && /^https:\/\//.test(r.url || ""); }).slice(0, 12);
+    await window.DB.setSetting("suggestions", { at: nowIso(), list: res ? list : ((cur && cur.list) || []), error: res ? null : "Claude gave no answer" });
+    B.log("Claude suggestions done: " + list.length);
+  }
+
   async function checkSearches(topic, searches) {
     var n = 0;
     for (var i = 0; i < searches.length; i++) {
@@ -312,6 +333,7 @@
       sizesText = sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "";
       var n = await checkItems(topic, d.wishlist, d.status, force) + await checkSearches(topic, d.searches);
       try { n += await claudeSearch(topic, d); } catch (e) { B.log("Claude price search error: " + (e.message || e)); }
+      try { await claudeSuggest(d); } catch (e) { B.log("Claude suggestions error: " + (e.message || e)); }
       await sb.from("runner").update({ beat: nowIso() }).eq("user_id", window.DB.uid);
       if (topic) B.fetchText("https://ntfy.sh/" + topic + "-hb", { method: "POST", body: "up" }).catch(function () {});
       if (Math.random() < 0.05) sb.rpc("cleanup");
