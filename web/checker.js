@@ -175,7 +175,7 @@
       return { title: xmlTag(x, "title"), link: xmlTag(x, "link"), shop: m[1] || "", price: parseFloat(String(m[2] || "").replace(/[^0-9,.]/g, "").replace(",", ".")) || null,
         image: (x.match(/<media:content[^>]*url="([^"]+)"/) || [])[1] || null, desc: desc.slice(0, 400) };
     }).filter(function (d) { if (!d.link || !d.price || seenLink[d.link]) return false; seenLink[d.link] = 1; return true; });
-    var MARKET = /allegro|aliexpress|temu|shein|ebay|wish\b|joom|olx|vinted|banggood|dhgate|amazon\s*marketplace/i;
+    var MARKET = /allegro|aliexpress|temu|shein|ebay|wish\b|joom|banggood|dhgate|amazon\s*marketplace/i;
     deals.forEach(function (d) { if (MARKET.test(d.shop + " " + d.link)) return; if (!dealPool[d.link]) dealPool[d.link] = Object.assign({ seen: Date.now() }, d); });
     var n = 0, judged = 0;
     for (var i = 0; i < items.length; i++) {
