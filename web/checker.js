@@ -213,7 +213,8 @@
         return { id: i.id, name: i.name, category: i.category, size: i.size || "", used: i.used, target: i.target, max: i.max, notes: String(i.notes || "").slice(0, 300),
           nowAt: st.price || null, cheapestFound: st.best ? st.best.price + " zł at " + st.best.shop : null };
       });
-      var list = await B.suggest({ wishlist: wants, sizes: sz, deals: deals.map(function (x, n) { return { n: n + 1, title: x.title, price: x.price, shop: x.shop, desc: x.desc.slice(0, 200) }; }) });
+      var promos = await window.DB.getSetting("promos").catch(function () { return ""; });
+      var list = await B.suggest({ wishlist: wants, sizes: sz, promos: promos, deals: deals.map(function (x, n) { return { n: n + 1, title: x.title, price: x.price, shop: x.shop, desc: x.desc.slice(0, 200) }; }) });
       if (!Array.isArray(list)) { B.log("suggestions: no answer from Claude"); return; }
       var out = list.map(function (x) {
         var deal = deals[(x.n | 0) - 1]; if (!deal) return null;
@@ -261,7 +262,7 @@
     var sz = await window.DB.getSetting("sizes").catch(function () { return null; });
     B.log("Claude price search started (" + items.length + " items)");
     var res = await B.priceSearch(items.map(function (i) { return { id: i.id, name: i.name, size: i.size, target: i.target, used: i.used, url: i.url, notes: i.notes }; }),
-      { sizes: sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "" });
+      { sizes: sz ? Object.keys(sz).map(function (k) { return k + ": " + sz[k]; }).join("; ") : "", promos: await window.DB.getSetting("promos").catch(function () { return ""; }) });
     if (!res) { B.log("Claude price search: no result"); return 0; }
     var fresh = {}, r0 = await sb.from("status").select("id,data").in("id", items.map(function (i) { return i.id; }));
     (r0.data || []).forEach(function (x) { fresh[x.id] = x.data; });

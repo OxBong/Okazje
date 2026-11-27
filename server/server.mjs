@@ -133,6 +133,7 @@ Pick the deals that are genuinely worth it for THIS buyer:
 Return 0-20 picks, best first. Reply with ONLY a JSON array, no other text:
 [{"n":<deal number>,"item":"<wishlist id, or null if not on the wishlist>","pick":"BUY or LOOK","why":"<max 200 chars: why it's worth it, how far from the target and the usual price>"}]
 
+Active payment/cashback promos the buyer can use (subtract them from the real price when they apply, and say so in why): ${input.promos || "none"}
 Buyer's sizes: ${JSON.stringify(input.sizes || {})}
 Wishlist: ${JSON.stringify(input.wishlist)}
 Deals: ${JSON.stringify(input.deals)}`;
@@ -161,7 +162,7 @@ async function priceSearch(items, ctx) {
 - Shoes: Zalando, eobuwie, Modivo, 50style, Footshop, Sizeer, Distance, Worldbox, Snipes, JD Sports, Sportano, Answear, About You, CCC, Deichmann, brand shops (Nike, Adidas, Puma, New Balance, Converse, Vans); EU: Zalando.de, Footlocker EU, END., Size? (only if they ship to PL with no big customs/fees).
 - Electronics: x-kom, Media Expert, RTV Euro AGD, MediaMarkt, Morele, Komputronik, Neonet, Allegro (only "Allegro Smart"/business sellers), Amazon.pl, Amazon.de (ships to PL), iSpot, Cortland, Apple refurbished, Samsung PL, Proline, Avans, OleOle, Electro.pl, Mi-Home, Lenovo/eLenovo, Dell, HP shops; outlets and "powystawowe"/refurb sections of these shops.
 - Home & other: IKEA, Allegro (business sellers), Amazon.pl, Empik, Notino, Rossmann, Hebe, Douglas, Ceneo.
-- Always also check the deal and comparison sites: Pepper.pl (current deals and codes), Ceneo, Skapiec, idealo.de/Geizhals (for EU shops shipping to PL), and the shops' outlet/sale pages. Same exact product (model, colour, size if given). Include valid public promo codes only if shown on the shop page. Skip out-of-stock, marketplace scams and fake discounts. Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}.
+- Always also check the deal and comparison sites: Pepper.pl (current deals and codes), Ceneo, Skapiec, idealo.de/Geizhals (for EU shops shipping to PL), and the shops' outlet/sale pages. Same exact product (model, colour, size if given). Include valid public promo codes only if shown on the shop page. Skip out-of-stock, marketplace scams and fake discounts. Buyer's sizes: ${(ctx && ctx.sizes) || "unknown"}. Also count payment/bank promos (BLIK Płacę Później, PayPo, bank cashback, app-only codes) that apply: give the effective price as price and mention the promo in note. Promos the buyer already knows: ${(ctx && ctx.promos) || "none"}.
 ${list}
 
 Reply with ONLY a JSON array, one object per product, no other text:

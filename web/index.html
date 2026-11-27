@@ -293,6 +293,11 @@ a.btn { text-decoration: none; display: inline-block; }
       <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="szSave">Save sizes</button></div>
       <span class="checked">Used by Claude when judging clothes and shoes deals.</span></div>
     </section>
+    <section class="card"><h2>Promos &amp; cashback</h2>
+      <textarea id="promos" rows="7" style="width:100%;font:inherit;padding:10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink)" placeholder="Paste promos here, e.g. BLIK Płacę Później at euro.com.pl: 50 zł back on 100 zł+, once, until 03.12.2026"></textarea>
+      <div class="set" style="margin-top:10px"><div class="row"><button class="btn small" type="button" id="promoSave">Save promos</button></div>
+      <span class="checked">Claude counts these in the real price (picks and price search) and looks for new ones too.</span></div>
+    </section>
     <section class="card"><h2>Account &amp; phone alerts</h2>
       <div class="set">
         <label>Phone alerts topic (ntfy)<input id="sNtfy" type="text" autocomplete="off" spellcheck="false" placeholder="your-ntfy-topic"></label>
@@ -776,6 +781,8 @@ a.btn { text-decoration: none; display: inline-block; }
       renderSizes(v);
     });
   }
+  DB.getSetting("promos").then(function (v) { $("promos").value = v || ""; }).catch(function () {});
+  $("promoSave").onclick = function () { DB.setSetting("promos", $("promos").value.trim().slice(0, 6000)).then(function () { toast("Promos saved"); }).catch(function (e) { toast(e.message); }); };
   $("szSave").onclick = function () { DB.setSetting("sizes", readSizes()).then(function () { toast("Sizes saved"); }).catch(function (e) { toast(e.message); }); };
 
   // App card (desktop app only): updates and the Claude connection
