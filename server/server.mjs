@@ -103,7 +103,7 @@ async function verdict(hit, criteria) {
   const capFile = path.join(data, "claude-count.json"), today = new Date().toISOString().slice(0, 10);
   let cap = { day: today, n: 0 };
   try { const c = JSON.parse(fs.readFileSync(capFile, "utf8")); if (c.day === today) cap = c; } catch {}
-  if (cap.n >= 10) return null;
+  if (cap.n >= 60) { log("Claude verdict limit (60/day) reached: hit saved without verdict, no phone push"); return null; }
   cap.n++; fs.writeFileSync(capFile, JSON.stringify(cap));
   let prompt = basePrompt(hit, criteria);
   const pdir = path.join(os.tmpdir(), "okazje-photos");
