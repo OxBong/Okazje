@@ -102,6 +102,7 @@
     var crit = h.criteria || (h.name + ", target price " + h.target + " zł, new from a legit Polish shop");
     if (sizesText && (h.clothes || CLOTHES.test(h.name))) crit += ". Buyer's sizes: " + sizesText + ". Say if the listed size likely fits.";
     if (h.target && h.price > h.target) crit += ". This price is " + Math.round(h.price - h.target) + " zł above the target, but the buyer wants every real discount: the target is a wish, not a hard limit. Answer BUY if it is a genuine discount and a good price for this exact product, and say how far above target it is.";
+    crit += ". If your answer is MAYBE but the buyer should see this one now (a rare, strong deal worth checking quickly), start your answer with \"MAYBE (worth a look)\" instead of plain MAYBE.";
     try { h.verdict = await B.verdict(h, crit); } catch (e) { h.verdict = null; }
     if (h.verdict) {                              // line 1 = short opinion (push), the rest = full analysis (app)
       var parts = String(h.verdict).split(/\n\s*\n/);
@@ -113,7 +114,7 @@
       await sb.from("hits").delete().eq("id", id); return false;
     }
     if (h.verdict || h.stored) await sb.from("hits").update({ data: h }).eq("id", id);
-    if (topic && h.verdict && /^BUY/.test(h.verdict)) { try { await push(topic, h); } catch (e) { B.log("push failed: " + e); } }
+    if (topic && h.verdict && /^(BUY|MAYBE \(worth a look\))/i.test(h.verdict)) { try { await push(topic, h); } catch (e) { B.log("push failed: " + e); } }
     B.notify("Okazje: " + h.name, h.price + " zł" + (h.verdict ? " · " + h.verdict.split(".")[0] : ""));
     return true;
   }
